@@ -4,7 +4,7 @@ class RouteTransaction {
   String? durasi;
   String? distance;
   String? trafficTime;
-  List<LatLng>? location;
+  String? location;
 
   RouteTransaction(
       {this.durasi, this.distance, this.trafficTime, this.location});

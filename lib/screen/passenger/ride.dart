@@ -13,6 +13,7 @@ import 'package:bottom_sheet/bottom_sheet.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:signgoogle/utils/api.dart';
 import 'package:signgoogle/utils/basic_auth.dart';
+import 'package:signgoogle/utils/mapbox.dart';
 import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
 import 'package:easy_autocomplete/easy_autocomplete.dart';
@@ -369,24 +370,26 @@ class _PassengerRideState extends State<PassengerRide> {
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever ||
         !serviceEnabled) {
-      showAlert(context) {
-        return AlertDialog(
-          content: Text("Aktifkan lokasi dulu dong"),
-          actions: [
-            MaterialButton(
-                child: Text("OK"),
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                })
-          ],
-        );
-      }
+      showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              content: Text("Harap aktifkan lokasi terlebih dahulu"),
+              actions: [
+                MaterialButton(
+                    child: Text("OK"),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.pop(context);
+                    })
+              ],
+            );
+          });
     } else {
       setState(() {
         catchData = true;
       });
-      print(_textFields.length);
+      //print(_textFields.length);
       _textValues.clear(); // Clear the existing values before collecting again
       directionDestLatLngs.clear();
       directionDestLatLngs.add(
@@ -415,15 +418,10 @@ class _PassengerRideState extends State<PassengerRide> {
             }
           } catch (e) {}
         }
-        var distance = await Geolocator.distanceBetween(
-            dataLatLngs.first.latitude,
-            dataLatLngs.first.longitude,
-            dataLatLngs.last.latitude,
-            dataLatLngs.last.latitude);
 
         if ((_textValues.length + directionDestLatLngs.length - 1) ==
             directionDestLatLngs.length) {
-          print("goooooo");
+          //print("goooooo");
           /*  await Navigator.push(
               context,
               MaterialPageRoute(
@@ -436,7 +434,7 @@ class _PassengerRideState extends State<PassengerRide> {
           });
         }
       } else {
-        print("goooooo");
+        //print("goooooo");
         /* await Navigator.push(
             context,
             MaterialPageRoute(
@@ -454,15 +452,39 @@ class _PassengerRideState extends State<PassengerRide> {
   Future<void> getScheduleCar(
       List<flutterMapDirection.LatLng> directionDestLatLngs,
       List<LatLng> dataLatLngs) async {
-    double getDisatance = Geolocator.distanceBetween(
+    /* double getDisatance = Geolocator.distanceBetween(
         directionDestLatLngs.first.latitude.toDouble(),
         directionDestLatLngs.first.longitude.toDouble(),
         directionDestLatLngs.last.latitude.toDouble(),
-        directionDestLatLngs.last.longitude.toDouble());
+        directionDestLatLngs.last.longitude.toDouble()); */
+    Uri getTrafficeUrl = Uri.parse(
+        "https://api.mapbox.com/directions/v5/mapbox/driving/${directionDestLatLngs.first.longitude}%2C${directionDestLatLngs.first.latitude}%3B${directionDestLatLngs.last.longitude}%2C${directionDestLatLngs.last.latitude}?alternatives=true&geometries=geojson&language=en&overview=full&steps=true&access_token=${accessTokenMapBox}");
+    var getTraffice = await http.get(getTrafficeUrl);
+    /* print(jsonEncode(_pickupController.text));
+    print(jsonEncode(_destinationController.text));
+    print(jsonEncode(_textValues)); */
+    List<String> locations = [];
+    locations.add(_pickupController.text);
+    locations.add(_destinationController.text);
+    if (_textValues.length != 0) {
+      locations.addAll(_textValues);
+    }
+
+    print(jsonEncode(locations));
+    print(jsonDecode(getTraffice.body)["routes"][0]["duration"]);
+    print(jsonDecode(getTraffice.body)["routes"][0]["legs"][0]["steps"][0]
+        ["intersections"][0]["bearings"][0]);
+    String bearing = jsonDecode(getTraffice.body)["routes"][0]["legs"][0]
+            ["steps"][0]["intersections"][0]["bearings"][0]
+        .toString();
+    String distance =
+        jsonDecode(getTraffice.body)["routes"][0]["distance"].toString();
+    String duration =
+        jsonDecode(getTraffice.body)["routes"][0]["duration"].toString();
     var apiUrl = Uri.parse("${ApiNetwork().baseUrl}${To().price}");
     var dataBody = {
       "service": "ride",
-      "qty": "${(getDisatance / 1000).toStringAsFixed(2)}",
+      "qty": "${(double.parse(distance) / 1000).toStringAsFixed(2)}",
       "area": "${area}"
     };
     /* String username = 'base64';
@@ -491,11 +513,15 @@ class _PassengerRideState extends State<PassengerRide> {
         context,
         MaterialPageRoute(
             builder: (context) => ChooseDriver(
+                locations: locations,
+                duration: duration,
+                bearing: bearing,
                 user: widget.user,
                 directionLatLng: directionDestLatLngs,
                 features: features,
-                getDisatance:
-                    (getDisatance / 1000).toStringAsFixed(2).toString())));
+                distance: (double.parse(duration) / 1000)
+                    .toStringAsFixed(2)
+                    .toString())));
     /* for (int i = 0; i <= features.length - 1; i++) {
         print(json.decode(response.body)["data"]["fitur"][i]["fitur"]);
       } */
