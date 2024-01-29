@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:button_animations/button_animations.dart';
 import 'package:button_animations/constants.dart';
 import 'package:flutter/material.dart';
@@ -5,9 +7,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logo_n_spinner/logo_n_spinner.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signgoogle/bloc/auth/auth_bloc.dart';
 import 'package:signgoogle/main.dart';
 import 'package:signgoogle/repo/Authentication.dart';
+import 'package:signgoogle/repo/driver.dart';
 import 'package:signgoogle/screen/driver/home.dart';
 import 'package:signgoogle/screen/passenger/home.dart';
 import 'package:signgoogle/utils/SmartransColor.dart';
@@ -121,7 +125,17 @@ class _SideMenuState extends State<SideMenu> {
                                         type: PredefinedThemes.warning,
                                         isOutline: false,
                                         borderWidth: 1,
-                                        onTap: () {
+                                        onTap: () async {
+                                          SharedPreferences userCache =
+                                              await SharedPreferences
+                                                  .getInstance();
+                                          DriverRepo driverRepo = DriverRepo();
+                                          String getUser = userCache
+                                              .get("userModel")
+                                              .toString();
+                                          driverRepo.changeStatus(
+                                              jsonDecode(getUser)["uid"],
+                                              "off");
                                           setState(() {
                                             isLoading = true;
                                           });

@@ -104,33 +104,6 @@ class PassengerHome extends StatefulWidget {
 class _PassengerHomeState extends State<PassengerHome> {
   late AuthRepository authRepository = AuthRepository();
   late GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  /* Future<void> setupInteractedMessage() async {
-    // Get any messages which caused the application to open from
-    // a terminated state.
-    await Firebase.initializeApp();
-    RemoteMessage? initialMessage =
-        await FirebaseMessaging.instance.getInitialMessage();
-
-    // If the message also contains a data property with a "type" of "chat",
-    // navigate to a chat screen
-    if (initialMessage != null) {
-      _handleMessage(initialMessage);
-    }
-
-    // Also handle any interaction when the app is in the background via a
-    // Stream listener
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessage);
-  }
-
-  void _handleMessage(RemoteMessage message) {
-    /* if (message.data['type'] == 'chat') {
-      Navigator.pushNamed(context, '/chat',
-        arguments: ChatArguments(message),
-      );
-    } */
-    print("notif open from home");
-  } */
-
   @override
   void initState() {
     super.initState();
@@ -239,19 +212,6 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
     print("data akun dari home");
     print(userModel.dataAccount);
   }
-
-/*   Future<void> getToken() async {
-    setState(() async {
-      _token = await FirebaseMessaging.instance.getToken();
-      updateTokenUser(_token.toString());
-    });
-
-    print("FCM Token: $_token");
-  }
-
-  void updateTokenUser(String token) {
-
-  } */
 
   late AnimationController _animationController;
   Widget homeWidget() {

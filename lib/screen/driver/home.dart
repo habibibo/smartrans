@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:bottom_sheet/bottom_sheet.dart';
 import 'package:currency_textfield/currency_textfield.dart';
@@ -18,8 +19,10 @@ import 'package:logo_n_spinner/logo_n_spinner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signgoogle/bloc/auth/auth_bloc.dart';
 import 'package:signgoogle/main.dart';
+import 'package:signgoogle/model/driverlatlng.dart';
 import 'package:signgoogle/model/notif/notif_list_job.dart';
 import 'package:signgoogle/model/user.dart';
+import 'package:signgoogle/repo/driver.dart';
 import 'package:signgoogle/screen/driver/berkas_driver.dart';
 import 'package:signgoogle/screen/driver/history.dart';
 import 'package:signgoogle/screen/driver/profile.dart';
@@ -160,36 +163,94 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   late int lengthListJobs2 = 0;
   String listJobString = "";
   var width, height;
+  int testIndex = 0;
+  DriverRepo driverRepo = DriverRepo();
+  late NotifListJob notifListJob;
+  double currentLat = 0;
+  double currentLng = 0;
+  late bool serviceEnabled;
+  late LocationPermission permission;
 
   @override
   void initState() {
     super.initState();
+    driverRepo.changeStatus(userModel.uid.toString(), "off");
     WidgetsFlutterBinding.ensureInitialized();
     _pageController = PageController(initialPage: _page);
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       var dataBody = jsonDecode(
           jsonEncode(jsonDecode(message.notification!.body.toString())));
       print('Got a message whilst in the foreground!');
-      print('Message data: ${dataBody["mode"]}');
-
-      messageConversion(dataBody, message.notification!.title.toString());
-      print("from main");
+      //print('Message data: ${dataBody["mode"]}');
+      if (dataBody["type"].toString() == "new_transactions") {
+        messageConversion(dataBody, message.notification!.title.toString());
+        print("from driver home");
+      }
     });
     getToken();
     loadOrder();
     getUserCache();
-    subscribeTopics();
+    _getCurrentLocation();
+    // subscribeTopics();
   }
 
-  Future<void> subscribeTopics() async {
+  /* Future<void> subscribeTopics() async {
     await FirebaseMessaging.instance.subscribeToTopic("topics/surabaya");
+  } */
+
+  Future<void> _getCurrentLocation() async {
+    print(LocationPermission.values);
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
+    if (!serviceEnabled) {
+      await _showLocationServiceDialog();
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.deniedForever) {
+        await _showLocationServiceDialog();
+      }
+    }
+    Position? position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
+    setState(() {
+      currentLat = position.latitude;
+      currentLng = position.longitude;
+    });
+  }
+
+  Future<void> _showLocationServiceDialog() async {
+    showDialog(
+      barrierDismissible: false,
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Lokasi Belum Diizinkan"),
+          content: Text("Aktifkan lokasi dulu yaa..."),
+          actions: <Widget>[
+            MaterialButton(
+              child: Text("OK"),
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> messageConversion(var messageData, String title) async {
-    _showNotification(messageData, title);
+    //_showNotification(messageData, title);
     final SharedPreferences driverCache = await SharedPreferences.getInstance();
     String? existingJsonString = driverCache.getString("listJob");
-    print(existingJsonString);
+    print("message conversion");
+    print(messageData);
+    // addListJobs(messageData);
+
     if (existingJsonString != null) {
       List<dynamic> existingList = jsonDecode(existingJsonString.toString());
       List<NotifListJob> existingJobs =
@@ -230,31 +291,37 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       await driverCache.setString("listJob", newJsonString);
     }
 
-    print(driverCache.getString("listJob"));
+    //driverCache.getString("listJob"));
   }
 
   Future<void> getUserCache() async {
     SharedPreferences cacheUser = await SharedPreferences.getInstance();
-    userModel.id = jsonDecode(cacheUser.get("userModel").toString())["id"];
+    userModel.id =
+        jsonDecode(cacheUser.get("userModel").toString())["id"].toString();
     userModel.email =
-        jsonDecode(cacheUser.get("userModel").toString())["email"];
-    userModel.uid = jsonDecode(cacheUser.get("userModel").toString())["uid"];
+        jsonDecode(cacheUser.get("userModel").toString())["email"].toString();
+    userModel.uid =
+        jsonDecode(cacheUser.get("userModel").toString())["uid"].toString();
     userModel.deposit =
-        jsonDecode(cacheUser.get("userModel").toString())["deposit"];
+        jsonDecode(cacheUser.get("userModel").toString())["deposit"].toString();
     userModel.dataDriver =
-        jsonDecode(cacheUser.get("userModel").toString())["data_driver"];
+        jsonDecode(cacheUser.get("userModel").toString())["data_driver"]
+            .toString();
     userModel.dataAccount =
-        jsonDecode(cacheUser.get("userModel").toString())["data_account"];
+        jsonDecode(cacheUser.get("userModel").toString())["data_account"]
+            .toString();
     userModel.location =
-        jsonDecode(cacheUser.get("userModel").toString())["location"];
+        jsonDecode(cacheUser.get("userModel").toString())["location"]
+            .toString();
     userModel.point =
-        jsonDecode(cacheUser.get("userModel").toString())["point"];
+        jsonDecode(cacheUser.get("userModel").toString())["point"].toString();
     userModel.transaction =
-        jsonDecode(cacheUser.get("userModel").toString())["transaction"];
+        jsonDecode(cacheUser.get("userModel").toString())["transaction"]
+            .toString();
     userModel.rating =
-        jsonDecode(cacheUser.get("userModel").toString())["rating"];
+        jsonDecode(cacheUser.get("userModel").toString())["rating"].toString();
     userModel.token =
-        jsonDecode(cacheUser.get("userModel").toString())["token"];
+        jsonDecode(cacheUser.get("userModel").toString())["token"].toString();
     dateBirthController.text =
         jsonDecode(userModel.dataAccount.toString())["tanggal_lahir"];
   }
@@ -303,8 +370,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       pembayaran: messageData["data"]["pembayaran"].toString(),
       waktu_pickup: messageData["data"]["waktu_pickup"].toString(),
       //jam: messageData["data"]["jam"].toString(),
-      isOpen: messageData["data"]["isOpen"],
-      token_user: messageData["data"]["token_user"],
+      //id_driver: "7468696e-6b62-4962-af40-676d61696c2e",
+      //nama_driver: widget.user!.displayName.toString(),
+      //foto_driver: "foto driver kosong",
+      //kendaraan: "kendaraan kosong",
+      //rating_driver: messageData["data"]["rating_driver"].toString(),
+      isOpen: true,
+      token_user: messageData["data"]["token_user"].toString(),
     ));
   }
 
@@ -382,37 +454,43 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               Text("Waktu jemput ${int.parse(message.waktu_jemput) / 60} mnt",
                   style: TextStyle(fontSize: 15)),
               SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  MaterialButton(
-                      padding: EdgeInsets.all(10),
-                      color: Colors.greenAccent,
-                      child: Text(
-                        "Accept",
-                      ),
-                      onPressed: () {
-                        showAccept(message, getIndex);
-                      }),
-                  MaterialButton(
-                      padding: EdgeInsets.all(10),
-                      color: Colors.blueAccent,
-                      child: Text(
-                        "Nego",
-                      ),
-                      onPressed: () {
-                        showOfferingDriver(context, message, getIndex);
-                      }),
-                  MaterialButton(
-                      padding: EdgeInsets.all(10),
-                      color: Colors.grey,
-                      child: Text(
-                        "Decline",
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      }),
-                ],
+              Visibility(
+                visible: message.isOpen == true ? true : false,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    MaterialButton(
+                        padding: EdgeInsets.all(10),
+                        color: Colors.greenAccent,
+                        child: Text(
+                          "Accept",
+                        ),
+                        onPressed: () {
+                          driverRepo.acceptBid(userModel, notifListJob, "",
+                              DriverLatLng(lat: currentLat, lng: currentLng));
+                          //driverRepo.acceptWithoutNego(userModel, notifListJob);
+                          showAccept(message, getIndex);
+                        }),
+                    MaterialButton(
+                        padding: EdgeInsets.all(10),
+                        color: Colors.blueAccent,
+                        child: Text(
+                          "Nego",
+                        ),
+                        onPressed: () {
+                          showOfferingDriver(context, message, getIndex);
+                        }),
+                    MaterialButton(
+                        padding: EdgeInsets.all(10),
+                        color: Colors.grey,
+                        child: Text(
+                          "Decline",
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                        }),
+                  ],
+                ),
               )
             ],
           ),
@@ -463,7 +541,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   controller: offeringController,
                   keyboardType: TextInputType.phone,
                   onSubmitted: (value) {
-                    Navigator.pop(context);
+                    driverRepo.acceptBid(
+                        userModel,
+                        notifListJob,
+                        offeringController.intValue.toString(),
+                        DriverLatLng(lat: currentLat, lng: currentLng));
                     showAcceptNego(offeringController.text, message, getIndex);
                   },
                 ),
@@ -509,14 +591,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     child: Column(
                       children: [
                         Text(
-                          "Menunggu jawaban penumpang",
+                          "Response telah terkirim ke penumpang",
                           style: TextStyle(
                               color: Colors.black,
                               fontSize: 15,
                               fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          "dengan ongkos ${price}",
+                          "dengan tarif ${price}",
                           style: TextStyle(
                               color: Colors.black,
                               fontSize: 15,
@@ -530,6 +612,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
           );
         });
+    setState(() {
+      listJobs2[getIndex].isOpen = false;
+    });
+    Future.delayed(Duration(seconds: 2), () {
+      Navigator.of(context, rootNavigator: true).pop();
+      Navigator.pop(context);
+      Navigator.pop(context);
+    });
   }
 
   void showAccept(NotifListJob message, int getIndex) {
@@ -564,7 +654,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     child: Column(
                       children: [
                         Text(
-                          "Menunggu jawaban penumpang",
+                          "Response telah terkirim ke penumpang",
                           style: TextStyle(
                               color: Colors.black,
                               fontSize: 15,
@@ -578,6 +668,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
           );
         });
+    setState(() {
+      listJobs2[getIndex].isOpen = false;
+    });
+    Future.delayed(Duration(seconds: 2), () {
+      Navigator.of(context, rootNavigator: true).pop();
+      Navigator.pop(context);
+    });
   }
 
   Future<void> getToken() async {
@@ -773,11 +870,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                             setState(() {
                                               isOnline = false;
                                               isOnlineText = "Offline";
+                                              var response =
+                                                  driverRepo.changeStatus(
+                                                      userModel.uid.toString(),
+                                                      "off");
+                                              print(response);
                                             });
                                           } else {
                                             setState(() {
                                               isOnline = true;
                                               isOnlineText = "Online";
+                                              var response =
+                                                  driverRepo.changeStatus(
+                                                      userModel.uid.toString(),
+                                                      "on");
+                                              print(response);
                                             });
                                           }
                                         }),
@@ -804,19 +911,23 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 itemBuilder: (context, index) {
                   return Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(5),
-                        topRight: Radius.circular(35),
-                        bottomLeft: Radius.circular(35),
-                        bottomRight: Radius.circular(5),
-                      ),
-                      color: listJobs2[lengthListJobs2 - 1 - index].isOpen
-                          ? Colors.lightGreen
-                          : Colors.grey[400],
-                    ),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(5),
+                          topRight: Radius.circular(35),
+                          bottomLeft: Radius.circular(35),
+                          bottomRight: Radius.circular(5),
+                        ),
+                        color: listJobs2[lengthListJobs2 - 1 - index].isOpen ==
+                                true
+                            ? Colors.lightGreen
+                            : Colors.grey[100]),
                     margin: EdgeInsets.only(bottom: 5, left: 10, right: 10),
                     child: ListTile(
                       onTap: () {
+                        setState(() {
+                          notifListJob = listJobs2[lengthListJobs2 - 1 - index];
+                        });
+                        print(jsonEncode(notifListJob));
                         showDetailJob(
                             context,
                             listJobs2[lengthListJobs2 - 1 - index],
@@ -839,7 +950,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "Tujuan penumpang ${int.parse(listJobs2[lengthListJobs2 - 1 - index].jarak_driver) / 1000} km",
+                            "Tujuan penumpang ${int.parse(listJobs2[lengthListJobs2 - 1 - index].distance) / 1000} km",
                           ),
                           Text(
                               "Tarif ${rupiah.format(int.parse(listJobs2[lengthListJobs2 - 1 - index].tarif))}"),

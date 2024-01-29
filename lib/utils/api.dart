@@ -13,4 +13,9 @@ class To {
   String updateUser = "edit_user_account";
   String oldNearbyDriver = "pelanggan/list_car";
   String paymentMethod = "paymentmethod";
+  String createTransaction = "create_transaksi";
+  String updateStatusTransaction = "update_status_transaksi";
+  String assignTransaction = "assign_transaksi";
+  String updateLocation = "update_location";
+  String onoffDriver = "onoff_driver";
 }

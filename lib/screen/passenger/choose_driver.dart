@@ -7,24 +7,24 @@ import 'package:coupon_uikit/coupon_uikit.dart';
 import 'package:currency_textfield/currency_textfield.dart';
 import 'package:day_night_time_picker/day_night_time_picker.dart';
 import 'package:easy_date_timeline/easy_date_timeline.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_sliding_box/flutter_sliding_box.dart';
 //import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:intl/intl.dart';
 import 'package:linear_timer/linear_timer.dart';
-import 'package:logo_n_spinner/logo_n_spinner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:signgoogle/model/driver_model.dart';
+import 'package:signgoogle/model/customer_transaction.dart';
 import 'package:signgoogle/model/fitur.dart';
+import 'package:signgoogle/model/location.dart';
 import 'package:signgoogle/model/near_driver.dart';
-import 'package:signgoogle/model/notif/notif_list_job.dart';
+import 'package:signgoogle/model/notif/driver_bid.dart';
 import 'package:signgoogle/model/payment_method.dart';
+import 'package:signgoogle/model/pricing_detail.dart';
+import 'package:signgoogle/model/transaction.dart';
+import 'package:signgoogle/repo/passenger.dart';
 import 'package:signgoogle/screen/passenger/live_tracking.dart';
 import 'package:signgoogle/screen/passenger/ride.dart';
 //import 'package:jubercar/screens/home/member/choose_map.dart';
@@ -34,6 +34,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 import 'package:signgoogle/utils/api.dart';
 import 'package:signgoogle/utils/basic_auth.dart';
+import 'package:signgoogle/utils/mapbox.dart';
 //import 'package:location/location.dart';
 import 'package:sliding_up_panel2/sliding_up_panel2.dart';
 import 'package:flutter_map_directions/flutter_map_directions.dart'
@@ -118,13 +119,19 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final List<flutterMapDirection.LatLng> directionLatLng = [];
   final List<Feature> features = [];
-  final String getDisatance = "";
+  final List<String> locations = [];
+  final String distance = "";
+  final String duration = "";
+  final String bearing = "";
   GoogleSignInAccount? user;
   runApp(ChooseDriver(
+      duration: duration,
+      bearing: bearing,
       user: user,
       directionLatLng: directionLatLng,
       features: features,
-      getDisatance: getDisatance));
+      locations: locations,
+      distance: distance));
   // runApp(const MyApp());
 }
 
@@ -133,13 +140,19 @@ class ChooseDriver extends StatefulWidget {
       {Key? key,
       required this.user,
       required this.directionLatLng,
+      required this.locations,
       required this.features,
-      required this.getDisatance})
+      required this.distance,
+      required this.bearing,
+      required this.duration})
       : super(key: key);
   final List<flutterMapDirection.LatLng> directionLatLng;
   final List<Feature> features;
-  final String getDisatance;
+  final String distance;
   GoogleSignInAccount? user;
+  final String bearing;
+  final String duration;
+  final List<String> locations;
 
   @override
   State<ChooseDriver> createState() => _ChooseDriverState();
@@ -160,11 +173,7 @@ class _ChooseDriverState extends State<ChooseDriver> {
   DateTime changeDateSchedule = DateTime.now().add(Duration(days: 1));
   String changeTimeNow = "${DateTime.now().hour} : ${DateTime.now().minute}";
   TextEditingController _searchController = TextEditingController();
-  //Location location = Location();
   final BoxController boxController = BoxController();
-  //final LatLng _center = const LatLng(45.521563, -122.677433);
-
-  //LatLng _initialCameraPosition = LatLng(0.0, 0.0);
   num lat = 0;
   num lng = 0;
 
@@ -181,7 +190,7 @@ class _ChooseDriverState extends State<ChooseDriver> {
   List<flutterMapDirection.LatLng> newLatLng = [];
   List<DateTime> dates = [];
   List<PaymentMethod> paymentMethods = [];
-
+  List<Location> newLocation = [];
   bool visible1 = true;
   String minPrice = "";
   String maxOffer = "";
@@ -191,7 +200,7 @@ class _ChooseDriverState extends State<ChooseDriver> {
     super.initState();
     _getCurrentLocation();
     disableDates();
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    /* FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       var dataBody = jsonDecode(
           jsonEncode(jsonDecode(message.notification!.body.toString())));
       print('Got a message whilst in the foreground!');
@@ -199,8 +208,9 @@ class _ChooseDriverState extends State<ChooseDriver> {
 
       messageConversion(dataBody, message.notification!.title.toString());
       print("from main");
-    });
+    }); */
     getPaymentMethod();
+    print(jsonEncode(widget.locations));
     //convertToDirection();
   }
 
@@ -285,6 +295,40 @@ class _ChooseDriverState extends State<ChooseDriver> {
         LatLng(widget.directionLatLng[0].latitude,
             widget.directionLatLng[0].longitude),
         18.0);
+  }
+
+  List<NearDriver> nearDrivers = [];
+  Future<void> getNearDriver() async {
+    /* FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      var dataBody = jsonDecode(
+          jsonEncode(jsonDecode(message.notification!.body.toString())));
+      print('Got a message whilst in the foreground!');
+      print('Message data: ${dataBody["data"]}');
+      print(dataBody["data"][0]["jarakMinimum"]);
+      nearDrivers.add(NearDriver(
+          jarakMinimum: dataBody["data"][0]["jarakMinimum"],
+          walletMinimum: dataBody["data"][0]["walletMinimum"],
+          id: dataBody["data"][0]["id"],
+          namaDriver: dataBody["data"][0]["namaDriver"],
+          latitude: dataBody["data"][0]["latitude"],
+          longitude: dataBody["data"][0]["longitude"],
+          bearing: dataBody["data"][0]["bearing"],
+          updateAt: dataBody["data"][0]["updatedAt"],
+          merek: dataBody["data"][0]["merek"],
+          nomorKendaraan: dataBody["data"][0]["nomorKendaraan"],
+          warna: dataBody["data"][0]["warna"],
+          tipe: dataBody["data"][0]["tipe"],
+          saldo: dataBody["data"][0]["saldo"],
+          noTelepon: dataBody["data"][0]["noTelepon"],
+          foto: dataBody["data"][0]["foto"],
+          regId: dataBody["data"][0]["regId"],
+          driverJob: dataBody["data"][0]["driverJob"],
+          distance: dataBody["data"][0]["distance"]));
+      showDriverListNew(nearDrivers, context);
+      //messageConversion(dataBody, message.notification!.title.toString());
+      print("from main");
+    }); */
+    //showDriverListNew(nearDrivers, context);
   }
 
   Widget showPanel(BuildContext context) {
@@ -1336,7 +1380,8 @@ class _ChooseDriverState extends State<ChooseDriver> {
     String userToken = cacheUser.getString("userModel").toString();
     print(offerPriceController.text);
     try {
-      final messageData = {
+      getNearDriver();
+      /* final messageData = {
         "to": "/topics/surabaya",
         "priority": "high",
         "direct_boot_ok": true,
@@ -1376,7 +1421,7 @@ class _ChooseDriverState extends State<ChooseDriver> {
         encoding: Encoding.getByName('utf-8'),
       );
 
-      print(responseDriver.body);
+      print(responseDriver.body); */
       /*
       var response = await http.post(
         Uri.parse(ApiNetwork().oldUrl + To().oldNearbyDriver),
@@ -1446,44 +1491,93 @@ class _ChooseDriverState extends State<ChooseDriver> {
   }
 
   List<LinearTimerController> linearTimerControllers = [];
+  List<NearDriver> driverList = [];
+  List<NearDriver> driverList2 = [];
+  bool isDialogShowing = false;
+
   Future<void> showDriverListNew(
-      List<NearDriver> driversList, BuildContext context) async {
-    /* int currentShowIndex = 0;
-    for (int i = 0; i < driversList.length; i++) {
-      await Future.delayed(
-          Duration(seconds: 2)); // Display each item for 6 seconds
-      //if (currentShowIndex < driversList.length - 1) {
-      setState(() {
-        currentShowIndex++;
-      });
-      //}
-    } */
-    List<Widget> widgetContainer = [];
-    late List<bool> isVisibleList;
-    isVisibleList = List.filled(driversList.length, false);
-    // Initialize timers for hiding containers after 7 seconds
-    /* for (int index = 0; index < driversList.length; index++) {
-      Timer(Duration(seconds: 7), () {
-        if (mounted) {
-          setState(() {
-            isVisibleList[index] = false; // Hide the Container after 7 seconds
-          });
-        }
-      });
-    } */
+      List<NearDriver> driversList,
+      BuildContext context,
+      Transaction transaction,
+      PricingDetails pricingDetails,
+      String duration,
+      String distance,
+      CustomerTransaction customerTransaction,
+      String uidTransaction) async {
     await showDialog(
         context: context,
         builder: (context) {
           return AlertDialog(
             contentPadding: EdgeInsets.all(0),
             backgroundColor: Colors.transparent,
-            content: DialogContent(
+            content: /* Container(
+              width: 150,
+              height: 300,
+              child: ListView.builder(
+                itemCount: driverList2.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(driverList2[index].namaDriver.toString()),
+                  );
+                },
+              ),
+            ), */
+                DialogContent2(
+              transaction: transaction,
+              pricingDetails: pricingDetails,
+              duration: duration,
+              distance: distance,
+              customerTransaction: customerTransaction,
+              uidTransaction: uidTransaction,
+              newLocation: newLocation,
+            ),
+            /* DialogContent(
               isVisibleList:
                   isVisibleList, // Replace with your list of visibility
               driversList: driversList, // Replace with your list of drivers
-            ),
+            ), */
           );
         });
+  }
+
+  void showDriverListDialog() {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      var dataBody = jsonDecode(
+          jsonEncode(jsonDecode(message.notification!.body.toString())));
+      print('Got a message whilst in the foreground!');
+      print('Message data: ${dataBody["data"]}');
+      //print(dataBody["data"][0]["jarakMinimum"]);
+      setState(() {
+        driverList2.add(NearDriver(
+            jarakMinimum: dataBody["data"][0]["jarakMinimum"],
+            walletMinimum: dataBody["data"][0]["walletMinimum"],
+            id: dataBody["data"][0]["id"],
+            namaDriver: dataBody["data"][0]["namaDriver"],
+            latitude: dataBody["data"][0]["latitude"],
+            longitude: dataBody["data"][0]["longitude"],
+            bearing: dataBody["data"][0]["bearing"],
+            updateAt: dataBody["data"][0]["updatedAt"],
+            merek: dataBody["data"][0]["merek"],
+            nomorKendaraan: dataBody["data"][0]["nomorKendaraan"],
+            warna: dataBody["data"][0]["warna"],
+            tipe: dataBody["data"][0]["tipe"],
+            saldo: dataBody["data"][0]["saldo"],
+            noTelepon: dataBody["data"][0]["noTelepon"],
+            foto: dataBody["data"][0]["foto"],
+            regId: dataBody["data"][0]["regId"],
+            driverJob: dataBody["data"][0]["driverJob"],
+            distance: dataBody["data"][0]["distance"]));
+      });
+      print(jsonEncode(driverList2));
+      /* for (int i = 0; i <= driverList.length; i++) {
+        Future.delayed(Duration(seconds: i * 2), () {
+          print("${i} true");
+          setState(() {
+            widget.isVisibleList[i] = true;
+          });
+        });
+      } */
+    });
   }
 
   Future<void> getPaymentMethod() async {
@@ -1566,10 +1660,9 @@ class _ChooseDriverState extends State<ChooseDriver> {
                 children: [
                   TileLayer(
                     urlTemplate:
-                        "https://api.mapbox.com/styles/v1/bibohabib/clpqqrem1014q01o962k54da8/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1IjoiYmlib2hhYmliIiwiYSI6ImNscG04MGVzdDA2MWUya3FtdDMxbDBuNDUifQ.ivQ5qmo7cPT4FaC6Q2aalQ",
+                        "https://api.mapbox.com/styles/v1/bibohabib/clpqqrem1014q01o962k54da8/tiles/256/{z}/{x}/{y}@2x?access_token=${accessTokenMapBox}",
                     additionalOptions: {
-                      'accessToken':
-                          'sk.eyJ1IjoiYmlib2hhYmliIiwiYSI6ImNscG5tMGtsYzBwN2UybW9icGk2ZzY5emcifQ.UneRCntojkFKhKCdEQKosg',
+                      'accessToken': tokenMapbox,
                       'id': 'mapbox.streets',
                     },
                   ),
@@ -1700,7 +1793,189 @@ class _ChooseDriverState extends State<ChooseDriver> {
                     onPressed: () async {
                       if (defaultPrice != "") {
                         if (paymentMethod != "") {
-                          findNearbyDriver(context);
+                          print(
+                              "price ${jsonEncode(widget.features[selectedIndex].price)}");
+                          newLocation = [];
+                          for (int i = 0;
+                              i <= widget.directionLatLng.length - 1;
+                              i++) {
+                            newLocation.add(Location(
+                                address: widget.locations[i],
+                                lat: widget.directionLatLng[i].latitude
+                                    .toString(),
+                                lng: widget.directionLatLng[i].longitude
+                                    .toString()));
+                          }
+                          print(jsonEncode(newLocation
+                              .map((location) => location.toJson())
+                              .toList()));
+                          Transaction transaction = Transaction(
+                              nowlater: "1",
+                              waktuPickup: "${scheduleDate} ${scheduleTime}",
+                              notes: "",
+                              addons: "",
+                              idFitur:
+                                  widget.features[selectedIndex].id.toString(),
+                              fitur: widget.features[selectedIndex].name
+                                  .toString(),
+                              pax: "",
+                              qty: "",
+                              area: "surabaya",
+                              paymentmethod: paymentMethod,
+                              promo: promo);
+
+                          final routeTransaction = {
+                            "durasi": widget.duration,
+                            "distance": widget.distance,
+                            "trafficTime": widget.duration,
+                            "location": [
+                              jsonEncode(newLocation
+                                  .map((location) => location.toJson())
+                                  .toList())
+                            ]
+                          };
+
+                          CustomerTransaction customerTransaction =
+                              CustomerTransaction(
+                                  uidUser:
+                                      "7468696e-6b62-4962-af40-676d61696c2e",
+                                  nama: widget.user!.displayName,
+                                  phone: "6285604989623",
+                                  email: widget.user!.email);
+
+                          print(customerTransaction.toJson().toString());
+                          /* final dataTransaction = {
+                            "rute": routeTransaction.toString(),
+                            "price": widget.features[selectedIndex].price
+                                .toJson()
+                                .toString(),
+                            "transaction": transaction.toJson().toString(),
+                            "customer": {
+                              "uid_user":
+                                  "7468696e-6b62-4962-af40-676d61696c2e",
+                              "nama": widget.user!.displayName,
+                              "phone": "6285604989623",
+                              "email": widget.user!.email
+                            }
+                          };
+
+                          print(jsonEncode(dataTransaction)); */
+                          Uri apiUrlCreateTransaction = Uri.parse(
+                              "${ApiNetwork().baseUrl}${To().createTransaction}");
+                          var response = await http.post(
+                              apiUrlCreateTransaction,
+                              headers: <String, String>{
+                                'Authorization': basicAuth,
+                                'Content-Type':
+                                    "application/json; charset=UTF-8",
+                              },
+                              // use for this user
+                              body: jsonEncode({
+                                "rute": routeTransaction,
+                                /* "rute": {
+                                  "durasi": "0",
+                                  "distance": "16100",
+                                  "trafficTime": "2340",
+                                  "location": [
+                                    jsonEncode(newLocation
+                                        .map((location) => location.toJson())
+                                        .toList())
+                                  ]
+                                },
+                                */
+                                /*  "price": jsonEncode(widget
+                                        .features[selectedIndex].price
+                                        .toString()), */
+                                "price": {
+                                  "basefare": widget
+                                      .features[selectedIndex].price.baseFare,
+                                  "distancefare": widget.features[selectedIndex]
+                                      .price.distanceFare,
+                                  "basicfare": widget
+                                      .features[selectedIndex].price.basicFare,
+                                  "surgecharge": widget.features[selectedIndex]
+                                      .price.surgeCharge,
+                                  "servicecharge": widget
+                                      .features[selectedIndex]
+                                      .price
+                                      .serviceCharge,
+                                  "extra1": widget
+                                      .features[selectedIndex].price.extra1,
+                                  "extra2": widget
+                                      .features[selectedIndex].price.extra2,
+                                  "tol":
+                                      widget.features[selectedIndex].price.tol,
+                                  "upping": widget
+                                      .features[selectedIndex].price.upping,
+                                  "charge": widget
+                                      .features[selectedIndex].price.charge,
+                                  "stbd":
+                                      widget.features[selectedIndex].price.stbd,
+                                  "maxtawar": widget
+                                      .features[selectedIndex].price.maxTawar,
+                                  "tawar": widget
+                                      .features[selectedIndex].price.tawar,
+                                  "fleet": widget
+                                      .features[selectedIndex].price.fleet,
+                                  "discount": widget
+                                      .features[selectedIndex].price.discount,
+                                  "tips":
+                                      widget.features[selectedIndex].price.tips,
+                                  "stad":
+                                      widget.features[selectedIndex].price.stad,
+                                  "tax":
+                                      widget.features[selectedIndex].price.tax,
+                                  "price": offeringController.intValue != 0
+                                      ? offeringController.intValue.toString()
+                                      : widget
+                                          .features[selectedIndex].price.price,
+                                  "minprice": widget
+                                      .features[selectedIndex].price.minPrice
+                                },
+                                "transaction": transaction,
+                                /* "transaction": {
+                                  "nowlater": 1,
+                                  "waktu_pickup": "2024-01-08 21:37:19",
+                                  "notes": "tes notes",
+                                  "addons": "",
+                                  "id_fitur": "1",
+                                  "fitur": "SmartCar",
+                                  "pax": "1",
+                                  "qty": 1,
+                                  "area": "surabaya",
+                                  "paymentmethod": "CASH",
+                                  "promo": ""
+                                }, */
+                                "customer": customerTransaction
+                                /* "customer": {
+                                  "uid_user":
+                                      "7468696e-6b62-4962-af40-676d61696c2e",
+                                  "nama": "bejo sudarso",
+                                  "phone": "62874124127",
+                                  "email": "thinkbibo@gmail.com"
+                                } */
+                              }));
+                          print("create transaksi");
+                          //print(response.body);
+                          if (response.statusCode == 200) {
+                            if (response.body.isEmpty) {
+                              print("Data is empty");
+                            }
+                            print(response.body);
+                            // showDriverListDialog();
+                            var body = jsonDecode(response.body);
+
+                            showDriverListNew([],
+                                context,
+                                transaction,
+                                widget.features[selectedIndex].price,
+                                widget.duration,
+                                widget.distance,
+                                customerTransaction,
+                                body["data"]["uid"]);
+                          }
+
+                          //findNearbyDriver(context);
                           //getPaymentMethod();
                         } else {
                           await ScaffoldMessenger.of(context).showSnackBar(
@@ -1741,7 +2016,7 @@ class _ChooseDriverState extends State<ChooseDriver> {
   }
 }
 
-class DialogContent extends StatefulWidget {
+/* class DialogContent extends StatefulWidget {
   final List<bool> isVisibleList;
   final List<NearDriver> driversList;
 
@@ -1901,9 +2176,290 @@ class _DialogContentState extends State<DialogContent> {
           }),
     );
   }
+} */
+
+class DialogContent2 extends StatefulWidget {
+  //final List<bool> isVisibleList;
+  //final List<NearDriver> driversList;
+  Transaction transaction;
+  PricingDetails pricingDetails;
+  String duration;
+  String distance;
+  CustomerTransaction customerTransaction;
+  String uidTransaction;
+  List<Location> newLocation;
+  DialogContent2({
+    Key? key,
+    required this.transaction,
+    required this.pricingDetails,
+    required this.duration,
+    required this.distance,
+    required this.customerTransaction,
+    required this.uidTransaction,
+    required this.newLocation,
+  }) : super(key: key);
+
+  @override
+  _DialogContent2State createState() => _DialogContent2State();
 }
 
-class IncrementalListViewInDialog extends StatefulWidget {
+class _DialogContent2State extends State<DialogContent2> {
+  List<NearDriver> driverList = [];
+  List<DriverBid> driverList2 = [];
+  List<bool> isVisibleList = [];
+  int selected = 0;
+  @override
+  void initState() {
+    super.initState();
+    /* Timer.periodic(Duration(seconds: 4), (timer) {
+      if (mounted) {
+        setState(() {
+          driverList.add(NearDriver(
+              jarakMinimum: "tete",
+              walletMinimum: "tete",
+              id: "2000",
+              namaDriver: "tete",
+              latitude: "2000",
+              longitude: "2000",
+              bearing: "2000",
+              updateAt: "tete",
+              merek: "tete",
+              nomorKendaraan: "tete",
+              warna: "tete",
+              tipe: "tete",
+              saldo: "2000",
+              noTelepon: "tete",
+              foto: "tete",
+              regId: "2000",
+              driverJob: "tete",
+              distance: "2000"));
+          isVisibleList.add(true);
+        });
+      }
+    }); */
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      var dataBody = jsonDecode(
+          jsonEncode(jsonDecode(message.notification!.body.toString())));
+      print('Got a message whilst in the foreground!');
+      print('Message data: ${dataBody["data"]}');
+      //print(dataBody["data"][0]["jarakMinimum"]);
+      setState(() {
+        driverList2.add(DriverBid(
+            idPassenger: dataBody["data"][0]["id_passenger"].toString(),
+            namaPassenger: dataBody["data"][0]["nama_passenger"].toString(),
+            idDriver: dataBody["data"][0]["id_driver"].toString(),
+            namaDriver: dataBody["data"][0]["nama_driver"].toString(),
+            jarakTujuan: dataBody["data"][0]["jarak_tujuan"].toString(),
+            totalAlamat: dataBody["data"][0]["total_alamat"].toString(),
+            fotoDriver: dataBody["data"][0]["foto_driver"].toString(),
+            ratingDriver: dataBody["data"][0]["rating_driver"].toString(),
+            kendaraan: dataBody["data"][0]["kendaraan"].toString(),
+            driverLatLng: dataBody["data"][0]["driverLatLng"],
+            tarif: dataBody["data"][0]["tarif"].toString(),
+            bid: dataBody["data"][0]["bid"].toString(),
+            jarakDriver: dataBody["data"][0]["jarak_driver"].toString(),
+            waktuJemput: dataBody["data"][0]["waktu_jemput"].toString(),
+            pembayaran: dataBody["data"][0]["pembayaran"].toString()));
+        /* driverList.add(NearDriver(
+            jarakMinimum: dataBody["data"][0]["jarakMinimum"],
+            walletMinimum: dataBody["data"][0]["walletMinimum"],
+            id: dataBody["data"][0]["id"],
+            namaDriver: dataBody["data"][0]["namaDriver"],
+            latitude: dataBody["data"][0]["latitude"],
+            longitude: dataBody["data"][0]["longitude"],
+            bearing: dataBody["data"][0]["bearing"],
+            updateAt: dataBody["data"][0]["updatedAt"],
+            merek: dataBody["data"][0]["merek"],
+            nomorKendaraan: dataBody["data"][0]["nomorKendaraan"],
+            warna: dataBody["data"][0]["warna"],
+            tipe: dataBody["data"][0]["tipe"],
+            saldo: dataBody["data"][0]["saldo"],
+            noTelepon: dataBody["data"][0]["noTelepon"],
+            foto: dataBody["data"][0]["foto"],
+            regId: dataBody["data"][0]["regId"],
+            driverJob: dataBody["data"][0]["driverJob"],
+            distance: dataBody["data"][0]["distance"])); */
+        isVisibleList.add(true);
+      });
+      print("from dialog2");
+      /*  for (int i = 0; i <= driverList.length; i++) {
+        Future.delayed(Duration(seconds: i * 2), () {
+          print("${i} true");
+          setState(() {
+            widget.isVisibleList[i] = true;
+          });
+        });
+      } */
+    });
+    //setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return driverList2.length == 0
+        ? Container()
+        : Container(
+            width: 900,
+            height: 500,
+            child: ListView.builder(
+                itemCount: driverList2.length,
+                itemBuilder: (context, index) {
+                  return Visibility(
+                    visible: isVisibleList[index],
+                    child: Container(
+                        child: Card(
+                            child: Column(
+                      children: [
+                        Container(
+                          child: Column(
+                            children: [
+                              LinearTimer(
+                                duration: Duration(seconds: 5),
+                                forward: false,
+                                color: primaryColor,
+                                onTimerEnd: () {
+                                  setState(() {
+                                    print("remove ${index}");
+                                    //widget.driversList.removeAt(index);
+                                    isVisibleList[index] = false;
+                                    if (index == driverList2.length - 1) {
+                                      Navigator.pop(context);
+                                    }
+                                  });
+                                },
+                              ),
+                              ListTile(
+                                contentPadding: EdgeInsets.all(8.0),
+                                leading: Container(
+                                  decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.all(
+                                          Radius.circular(80))),
+                                  height: 80,
+                                  width: 55,
+                                  child: ClipOval(
+                                    child: Image.network(
+                                      driverList2[index].fotoDriver.toString(),
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return Icon(Icons.person);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                title: Text(
+                                  driverList2[index].namaDriver.toString(),
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                                trailing: Column(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      "Rp ${driverList2[index].tarif}",
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                    Text(
+                                        (double.parse(driverList2[index]
+                                                    .jarakTujuan
+                                                    .toString()) /
+                                                1000)
+                                            .toString(),
+                                        style: const TextStyle(fontSize: 14)),
+                                    const Text("5 mnt",
+                                        style: TextStyle(fontSize: 14)),
+                                  ],
+                                ),
+                                subtitle: Column(
+                                    mainAxisAlignment: MainAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(driverList2[index]
+                                          .kendaraan
+                                          .toString()),
+                                    ]),
+                              ),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  MaterialButton(
+                                      shape: const StadiumBorder(),
+                                      color: Colors.green,
+                                      child: const Text(
+                                        "Assign",
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      onPressed: () {
+                                        //widget.driverModel.id = index;
+                                        //widget.driverModel.name = items[index];
+                                        //Navigator.pop(context);
+                                        /* Navigator.pushReplacement(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                          builder: (context) => LiveTracking(
+                                                              user: widget.user,
+                                                              driverModel: widget.driverModel))); */
+
+                                        PassengerRepo().assign(
+                                            widget.uidTransaction,
+                                            widget.pricingDetails.price,
+                                            driverList2[index]
+                                                .idDriver
+                                                .toString());
+                                        Future.delayed(Duration(seconds: 2),
+                                            () {
+                                          Navigator.pushReplacement(
+                                              context,
+                                              MaterialPageRoute(
+                                                  builder: (context) => LiveTracking(
+                                                      transaction:
+                                                          widget.transaction,
+                                                      pricingDetails:
+                                                          widget.pricingDetails,
+                                                      duration: widget.duration,
+                                                      distance: widget.distance,
+                                                      customerTransaction: widget
+                                                          .customerTransaction,
+                                                      driverBid:
+                                                          driverList2[index],
+                                                      newLocation:
+                                                          widget.newLocation)));
+                                        });
+                                      }),
+                                  MaterialButton(
+                                      shape: const StadiumBorder(),
+                                      color: Colors.grey,
+                                      child: const Text(
+                                        "Decline",
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      onPressed: () {
+                                        isVisibleList[index] = false;
+                                      })
+                                ],
+                              )
+                            ],
+                          ),
+                        )
+                      ],
+                    ))),
+                  );
+                  /*  } else {
+                    return Container();
+                  }
+                }); */
+                }),
+          );
+  }
+}
+
+/* class IncrementalListViewInDialog extends StatefulWidget {
   IncrementalListViewInDialog(
       {Key? key, required this.driverModel, required this.user})
       : super(key: key);
@@ -2045,3 +2601,4 @@ class _IncrementalListViewInDialogState
     );
   }
 }
+ */
