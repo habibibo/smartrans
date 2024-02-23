@@ -16,15 +16,20 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_sliding_drawer/flutter_sliding_drawer.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logo_n_spinner/logo_n_spinner.dart';
+import 'package:quickalert/models/quickalert_type.dart';
+import 'package:quickalert/widgets/quickalert_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signgoogle/bloc/auth/auth_bloc.dart';
+import 'package:signgoogle/component/popup_loading.dart';
 import 'package:signgoogle/main.dart';
 import 'package:signgoogle/model/driverlatlng.dart';
+import 'package:signgoogle/model/location.dart';
 import 'package:signgoogle/model/notif/notif_list_job.dart';
 import 'package:signgoogle/model/user.dart';
 import 'package:signgoogle/repo/driver.dart';
 import 'package:signgoogle/screen/driver/berkas_driver.dart';
 import 'package:signgoogle/screen/driver/history.dart';
+import 'package:signgoogle/screen/driver/live_tracking.dart';
 import 'package:signgoogle/screen/driver/profile.dart';
 import 'package:signgoogle/screen/driver/wallet.dart';
 import 'package:signgoogle/screen/passenger/ride.dart';
@@ -34,6 +39,10 @@ import 'package:signgoogle/repo/Authentication.dart';
 import 'package:signgoogle/utils/SmartransColor.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:signgoogle/utils/api.dart';
+import 'package:signgoogle/utils/basic_auth.dart';
+import 'package:signgoogle/utils/mapbox.dart';
+import 'package:timelines/timelines.dart';
 
 /* int id = 0;
 
@@ -93,9 +102,10 @@ void notificationTapBackground(NotificationResponse notificationResponse) {
 } */
 
 class DriverHome extends StatefulWidget {
-  DriverHome({Key? key, required this.user, required this.isDriver})
+  DriverHome({Key? key, required this.userModel, required this.isDriver})
       : super(key: key);
-  GoogleSignInAccount? user;
+  //GoogleSignInAccount? user;
+  UserModel userModel;
   final bool isDriver;
   @override
   State<DriverHome> createState() => _DriverHomeState();
@@ -121,7 +131,7 @@ class _DriverHomeState extends State<DriverHome> {
                 authRepository: authRepository, navigatorKey: navigatorKey)
               ..add(AppStarted()),
             child: DriverHomeScreen(
-              user: widget.user,
+              userModel: widget.userModel,
               isDriver: widget.isDriver,
             ),
           ),
@@ -130,9 +140,10 @@ class _DriverHomeState extends State<DriverHome> {
 }
 
 class DriverHomeScreen extends StatefulWidget {
-  DriverHomeScreen({Key? key, required this.user, required this.isDriver})
+  DriverHomeScreen({Key? key, required this.userModel, required this.isDriver})
       : super(key: key);
-  GoogleSignInAccount? user;
+  //GoogleSignInAccount? user;
+  UserModel userModel;
   final bool isDriver;
 
   @override
@@ -153,7 +164,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   int id = 0;
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
-  late UserModel userModel = UserModel();
+  //late UserModel userModel = UserModel();
   bool recDesp = false;
   var dataAtual = new DateTime.now();
   final rupiah = NumberFormat.simpleCurrency(locale: 'id_ID');
@@ -168,14 +179,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   late NotifListJob notifListJob;
   double currentLat = 0;
   double currentLng = 0;
+  String area = "";
+  String latestArea = "";
+  String bearing = "";
+  String foto_akun = "";
   late bool serviceEnabled;
   late LocationPermission permission;
 
   @override
   void initState() {
     super.initState();
-    driverRepo.changeStatus(userModel.uid.toString(), "off");
+    _getCurrentLocation();
     WidgetsFlutterBinding.ensureInitialized();
+    final jsonUserModel = jsonEncode(widget.userModel.toJson());
+    foto_akun =
+        jsonDecode(jsonDecode(jsonUserModel)["data_account"])["foto_akun"];
     _pageController = PageController(initialPage: _page);
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       var dataBody = jsonDecode(
@@ -185,13 +203,49 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       if (dataBody["type"].toString() == "new_transactions") {
         messageConversion(dataBody, message.notification!.title.toString());
         print("from driver home");
+      } else if (dataBody["type"].toString() == "proove_bid") {
+        print("to live tracking driver");
+        liveTrackingDriver(dataBody, message.notification!.title.toString());
+      } else if (dataBody["type"].toString() == "passenger_assign") {
+        pickUpPassenger(dataBody, message.notification!.title.toString());
       }
     });
     getToken();
     loadOrder();
-    getUserCache();
-    _getCurrentLocation();
-    // subscribeTopics();
+    //getUserCache();
+
+    //subscribeT
+    //opics();
+  }
+
+  void pickUpPassenger(var messageData, String title) {
+    var responseTransaction =
+        driverRepo.getTransaction(messageData["data"]["uid"]);
+    responseTransaction.then((value) async {
+      print("data transaction");
+      var decodeData = jsonDecode(value)["data"];
+      List<dynamic> locationPassengers =
+          jsonDecode(decodeData["rute"])["location"];
+      List<Location> parseLocation = [];
+      for (int i = 0; i <= locationPassengers.length - 1; i++) {
+        parseLocation.add(Location(
+            address: locationPassengers[i]["address"],
+            lat: locationPassengers[i]["lat"],
+            lng: locationPassengers[i]["lng"]));
+      }
+      Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (context) => LiveTrackingDriver(
+                  locationPassenger: parseLocation,
+                  currentLat: currentLat,
+                  currentLng: currentLng,
+                  orderDetail: decodeData.toString())));
+    });
+  }
+
+  Future<void> liveTrackingDriver(var messageData, String title) async {
+    print(messageData);
   }
 
   /* Future<void> subscribeTopics() async {
@@ -199,6 +253,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   } */
 
   Future<void> _getCurrentLocation() async {
+    /* showDialog(
+        barrierDismissible: false,
+        context: (context),
+        builder: (context) {
+          return LogoandSpinner(
+            imageAssets: 'images/loadingsmartrans.png',
+            reverse: false,
+            arcColor: primaryColor,
+            spinSpeed: Duration(milliseconds: 500),
+          );
+        });
+    Future.delayed(Duration(seconds: 6), () {
+      Navigator.of(context, rootNavigator: true).pop();
+    }); */
     print(LocationPermission.values);
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
@@ -215,10 +283,79 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
     Position? position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high);
-    setState(() {
-      currentLat = position.latitude;
-      currentLng = position.longitude;
-    });
+    var apiUrl = Uri.parse(
+        "https://api.mapbox.com/geocoding/v5/mapbox.places/${position.longitude},${position.latitude}.json?language=id&access_token=sk.eyJ1IjoiYmlib2hhYmliIiwiYSI6ImNscG5tMGtsYzBwN2UybW9icGk2ZzY5emcifQ.UneRCntojkFKhKCdEQKosg");
+
+    try {
+      var response = await http.get(apiUrl);
+      if (response.statusCode == 200) {
+        var data = json.decode(response.body);
+
+        // get location from api user
+        SharedPreferences uid = await SharedPreferences.getInstance();
+        final dataBody = {"uid": uid.getString("uid").toString()};
+        final getUserUrl = Uri.parse("${ApiNetwork().baseUrl}${To().getUser}");
+        var responseLocation = await http.post(
+          getUserUrl,
+          headers: <String, String>{
+            'Authorization': basicAuth,
+            'Content-Type': "application/json; charset=UTF-8",
+          },
+          body: jsonEncode(dataBody),
+        );
+        UserModel user =
+            UserModel.fromJson(jsonDecode(responseLocation.body)["data"]);
+        var lastLocation = jsonDecode(user.location.toString());
+
+        setState(() {
+          //if (data["features"][0]["context"][3]["text_id"] == "Sidoarjo") {
+          //  area = "surabaya";
+          //} else {
+          area = data["features"][0]["context"][3]["text_id"];
+          //}
+
+          currentLat = position.latitude;
+          currentLng = position.longitude;
+          if (user.location == null) {
+            latestArea = area;
+            driverRepo.updateLocation(
+                uid.getString("uid").toString(),
+                currentLat.toString(),
+                currentLng.toString(),
+                "0",
+                area.toLowerCase());
+          } else {
+            latestArea = lastLocation["geofence"];
+          }
+        });
+
+        print(data["features"][0]["context"][3]["text_id"]);
+        print("latest area : ${latestArea}");
+        final newCurrentLocation = {
+          "bearing": "0",
+          "updated": DateTime.now().toString(),
+          "geofence": area.toLowerCase(),
+          "latitude": currentLat,
+          "longitude": currentLng,
+        };
+        print(uid.getString("uid").toString());
+        driverRepo.changeStatus(
+            uid.getString("uid").toString(), "off", latestArea.toLowerCase());
+        driverRepo.updateLocation(
+            uid.getString("uid").toString(),
+            currentLat.toString(),
+            currentLng.toString(),
+            "0",
+            area.toLowerCase());
+
+        // print(data["place_name"]);
+        //getUserCache();
+      } else {
+        throw Exception('Failed to load suggestions');
+      }
+    } catch (error) {
+      print('Error: $error');
+    }
   }
 
   Future<void> _showLocationServiceDialog() async {
@@ -250,8 +387,113 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     print("message conversion");
     print(messageData);
     // addListJobs(messageData);
+    var responseTransaction =
+        driverRepo.getTransaction(messageData["data"]["uid"]);
+    responseTransaction.then((value) async {
+      print("data transaction");
+      var decodeData = jsonDecode(value)["data"];
+      print(jsonDecode(jsonDecode(value)["data"]["transaction"])["nowlater"]);
+      //print(jsonDecode(value)["data"]["customer"]["nama"]);
+      //print(jsonDecode(value)["data"]["customer"]["phone"]);
+      String nowLater =
+          jsonDecode(jsonDecode(value)["data"]["transaction"])["nowlater"]
+              .toString();
+      double latUser = double.parse(
+          jsonDecode(jsonDecode(value)["data"]["rute"])["location"][0]["lat"]);
+      double lngUser = double.parse(
+          jsonDecode(jsonDecode(value)["data"]["rute"])["location"][0]["lng"]);
+      var distanceDriver =
+          Geolocator.distanceBetween(currentLat, currentLng, latUser, lngUser);
+      print(jsonDecode(decodeData["rute"])["location"]);
 
-    if (existingJsonString != null) {
+      /*  List<Location> locationList = [];
+
+      List<dynamic> jsonList = jsonDecode(decodeData["rute"])["location"];
+      print(jsonList[0]);
+      for (int i = 0; i <= jsonList.length - 1; i++) {
+        locationList.add(Location(
+            address: jsonList[i]["address"],
+            lat: jsonList[i]["lat"],
+            lng: jsonList[i]["lng"]));
+      } */
+      /* print("hasil for");
+      final cutFirstChar =
+          jsonEncode(jsonDecode(decodeData["rute"])["location"]).substring(0);
+      final sanitized = jsonDecode(decodeData["rute"])["location"];
+
+      print(
+          "sanitized ${jsonDecode(jsonEncode(jsonDecode(decodeData["rute"])["location"]))[0]['address']}"); */
+
+      NotifListJob nofitListJob = NotifListJob(
+          uid_transaction: decodeData["uid"].toString(),
+          uid_user: decodeData["uid_user"].toString(),
+          nama_user: messageData["data"]["nama_user"].toString(),
+          distance: messageData["data"]["distance"].toString(),
+          total_alamat: messageData["data"]["total_alamat"].toString(),
+          tarif: messageData["data"]["tarif"].toString(),
+          location: //"",
+              jsonEncode(jsonDecode(decodeData["rute"])["location"]).toString(),
+          jarak_driver: (distanceDriver / 1000).toStringAsFixed(2),
+          waktu_jemput: nowLater == "1" ? "Sekarang" : nowLater.toString(),
+          pembayaran: messageData["data"]["pembayaran"].toString(),
+          waktu_pickup: jsonDecode(
+              jsonDecode(value)["data"]["transaction"])["waktu_pickup"],
+          isOpen: true,
+          token_user: messageData["data"]["token_user"]);
+      print("conversion notif");
+      print(jsonEncode(nofitListJob));
+      if (existingJsonString != null) {
+        List<dynamic> existingList = jsonDecode(existingJsonString.toString());
+        List<NotifListJob> existingJobs =
+            existingList.map((map) => NotifListJob.fromJson(map)).toList();
+
+        // Add new jobs to existing jobs
+        //addListJobs(messageData);
+        listJobs.clear();
+        listJobs.add(nofitListJob);
+        existingJobs.addAll(listJobs);
+
+        // Convert the combined list to JSON
+        List<Map<String, dynamic>> combinedJsonList =
+            existingJobs.map((job) => job.toJson()).toList();
+
+        String combinedJsonString = jsonEncode(combinedJsonList);
+        List<NotifListJob> decodedJobList =
+            combinedJsonList.map((map) => NotifListJob.fromJson(map)).toList();
+        if (mounted) {
+          setState(() {
+            //listJobs2 = decodedJobList;
+            listJobs2.addAll(listJobs);
+            lengthListJobs2 = listJobs2.length;
+          });
+        }
+
+        // Update SharedPreferences with the combined data
+        await driverCache.setString("listJob", combinedJsonString);
+      } else {
+        //addListJobs(messageData);
+        listJobs.clear();
+        listJobs.add(nofitListJob);
+        // If no existing data, store the new jobs directly as JSON
+        List<Map<String, dynamic>> newJsonList =
+            listJobs.map((job) => job.toJson()).toList();
+
+        String newJsonString = jsonEncode(newJsonList);
+        List<NotifListJob> decodedJobList =
+            newJsonList.map((map) => NotifListJob.fromJson(map)).toList();
+        if (mounted) {
+          setState(() {
+            //listJobs2 = decodedJobList;
+            listJobs2.addAll(listJobs);
+            lengthListJobs2 = listJobs2.length;
+          });
+        }
+
+        await driverCache.setString("listJob", newJsonString);
+      }
+    });
+
+    /* if (existingJsonString != null) {
       List<dynamic> existingList = jsonDecode(existingJsonString.toString());
       List<NotifListJob> existingJobs =
           existingList.map((map) => NotifListJob.fromJson(map)).toList();
@@ -289,41 +531,78 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         lengthListJobs2 = listJobs2.length;
       });
       await driverCache.setString("listJob", newJsonString);
-    }
+    } */
 
     //driverCache.getString("listJob"));
   }
 
   Future<void> getUserCache() async {
+    /*
     SharedPreferences cacheUser = await SharedPreferences.getInstance();
-    userModel.id =
-        jsonDecode(cacheUser.get("userModel").toString())["id"].toString();
-    userModel.email =
-        jsonDecode(cacheUser.get("userModel").toString())["email"].toString();
-    userModel.uid =
-        jsonDecode(cacheUser.get("userModel").toString())["uid"].toString();
-    userModel.deposit =
-        jsonDecode(cacheUser.get("userModel").toString())["deposit"].toString();
-    userModel.dataDriver =
-        jsonDecode(cacheUser.get("userModel").toString())["data_driver"]
-            .toString();
-    userModel.dataAccount =
-        jsonDecode(cacheUser.get("userModel").toString())["data_account"]
-            .toString();
-    userModel.location =
-        jsonDecode(cacheUser.get("userModel").toString())["location"]
-            .toString();
-    userModel.point =
-        jsonDecode(cacheUser.get("userModel").toString())["point"].toString();
-    userModel.transaction =
-        jsonDecode(cacheUser.get("userModel").toString())["transaction"]
-            .toString();
-    userModel.rating =
-        jsonDecode(cacheUser.get("userModel").toString())["rating"].toString();
-    userModel.token =
-        jsonDecode(cacheUser.get("userModel").toString())["token"].toString();
-    dateBirthController.text =
-        jsonDecode(userModel.dataAccount.toString())["tanggal_lahir"];
+     Uri getTrafficeUrl = Uri.parse(
+        "https://api.mapbox.com/directions/v5/mapbox/driving/${currentLng}%2C${currentLat}%3B${currentLng}%2C${currentLat}?alternatives=true&geometries=geojson&language=en&overview=full&steps=true&access_token=${accessTokenMapBox}");
+    var getTraffice = await http.get(getTrafficeUrl); 
+    setState(() {
+      userModel.id =
+          jsonDecode(cacheUser.get("userModel").toString())["id"].toString();
+      userModel.email =
+          jsonDecode(cacheUser.get("userModel").toString())["email"].toString();
+      userModel.uid =
+          jsonDecode(cacheUser.get("userModel").toString())["uid"].toString();
+      userModel.deposit =
+          jsonDecode(cacheUser.get("userModel").toString())["deposit"]
+              .toString();
+      userModel.dataDriver =
+          jsonDecode(cacheUser.get("userModel").toString())["data_driver"]
+              .toString();
+      userModel.dataAccount =
+          jsonDecode(cacheUser.get("userModel").toString())["data_account"]
+              .toString();
+      userModel.location =
+          jsonDecode(cacheUser.get("userModel").toString())["location"]
+              .toString();
+      userModel.point =
+          jsonDecode(cacheUser.get("userModel").toString())["point"].toString();
+      userModel.transaction =
+          jsonDecode(cacheUser.get("userModel").toString())["transaction"]
+              .toString();
+      userModel.rating =
+          jsonDecode(cacheUser.get("userModel").toString())["rating"]
+              .toString();
+      userModel.token =
+          jsonDecode(cacheUser.get("userModel").toString())["token"].toString();
+      dateBirthController.text =
+          jsonDecode(userModel.dataAccount.toString())["tanggal_lahir"];
+
+      latestArea = jsonDecode(jsonDecode(
+          cacheUser.get("userModel").toString())["location"])["geofence"];
+      bearing = jsonDecode(getTraffice.body)["routes"][0]["legs"][0]["steps"][0]
+              ["intersections"][0]["bearings"][0]
+          .toString();  
+          
+    });
+    //print(jsonDecode(getTraffice.body));
+    //print("lokasi");
+    //print(jsonDecode(cacheUser.get("userModel").toString())["location"]);
+    print("latest area : ${latestArea}");
+    final newCurrentLocation = {
+      "bearing": "0",
+      "updated": DateTime.now().toString(),
+      "geofence": area.toLowerCase(),
+      "latitude": currentLat,
+      "longitude": currentLng,
+    };
+
+    driverRepo.changeStatus(userModel.uid.toString(), "off", latestArea);
+    Future.delayed(Duration(seconds: 1), () async {
+      driverRepo.updateLocation(userModel.uid.toString(), currentLat.toString(),
+          currentLng.toString(), "0", area);
+      setState(() {
+        userModel.location = jsonEncode(newCurrentLocation);
+        cacheUser.setString("userModel", jsonEncode(userModel));
+      });
+    });
+    */
   }
 /* 
   void showBerkasDriver() {
@@ -350,13 +629,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       await flutterLocalNotificationsPlugin.show(
           id++,
           title,
-          "Order baru dari ${message['data']['nama_user']} , total tujuan ${int.parse(message['data']['distance']) / 1000}km, dengan tarif Rp ${message['data']['tarif']}",
+          "Order baru dari ${message['data']['nama_user']} , total tujuan ${double.parse(message['data']['distance']) / 1000}km, dengan tarif Rp ${message['data']['tarif']}",
           notificationDetails,
           payload: 'item x');
     }
   }
 
-  void addListJobs(var messageData) {
+/*   void addListJobs(var messageData) {
     listJobs.clear();
     listJobs.add(NotifListJob(
       uid_user: messageData["data"]["uid_user"].toString(),
@@ -378,7 +657,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       isOpen: true,
       token_user: messageData["data"]["token_user"].toString(),
     ));
-  }
+  } */
 
   Future<void> loadOrder() async {
     final SharedPreferences driverCache = await SharedPreferences.getInstance();
@@ -401,9 +680,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   void showDetailJob(BuildContext context, NotifListJob message, int getIndex) {
     width = MediaQuery.of(context).size.width;
     height = MediaQuery.of(context).size.height;
+    bool isEdgeIndex(int index) {
+      return index == 0 || index == message.location.length + 1;
+    }
+
+    List<dynamic> newLocations = jsonDecode(message.location);
+    print(newLocations.length);
     showFlexibleBottomSheet<void>(
+      isDismissible: false,
       minHeight: 0,
-      initHeight: 0.4,
+      initHeight: 0.7,
       maxHeight: 1,
       context: context,
       isSafeArea: false,
@@ -423,21 +709,197 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             children: [
               Text(
                 message.nama_user,
-                style: TextStyle(fontSize: 15),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              Text("Waktu pickup ${message.waktu_pickup}",
+              Card(
+                  elevation: 2,
+                  child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(4),
+                      child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Waktu jemput",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            Padding(
+                                padding: const EdgeInsets.only(left: 10),
+                                child: Text(
+                                    "${message.waktu_jemput == 'Sekarang' ? 'Sekarang' : message.waktu_pickup}")),
+                          ]))),
+              SizedBox(
+                height: 5,
+              ),
+              Card(
+                  elevation: 2,
+                  child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(4),
+                      child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Tujuan penumpang",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            Padding(
+                                padding: const EdgeInsets.only(left: 10),
+                                child: Text(
+                                    "${double.parse(message.distance) / 1000}km")),
+                          ]))),
+              Card(
+                  elevation: 2,
+                  child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(4),
+                      child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Total lokasi",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            Padding(
+                                padding: const EdgeInsets.only(left: 10),
+                                child: Text(
+                                    "${double.parse(message.total_alamat)} lokasi")),
+                          ]))),
+              SizedBox(height: 5),
+              Card(
+                  elevation: 2,
+                  child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(4),
+                      child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Tarif",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            Padding(
+                                padding: const EdgeInsets.only(left: 10),
+                                child: Text(
+                                    "${rupiah.format(double.parse(message.tarif))}")),
+                          ]))),
+              SizedBox(height: 5),
+              Card(
+                  elevation: 2,
+                  child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(4),
+                      child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Pembayaran",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            Padding(
+                                padding: const EdgeInsets.only(left: 10),
+                                child: Text("${message.pembayaran}")),
+                          ]))),
+              /* Text("Waktu pickup ${message.waktu_pickup}",
+                  style: TextStyle(fontSize: 15)), */
+              /*   Text(
+                  "Jarak tujuan penumpang ${double.parse(message.distance) / 1000}km",
                   style: TextStyle(fontSize: 15)),
-              Text(
-                  "Jarak tujuan penumpang ${int.parse(message.distance) / 1000}km",
+              Text("Total tujuan penumpang ${double.parse(message.total_alamat)}",
                   style: TextStyle(fontSize: 15)),
-              Text("Total tujuan penumpang ${int.parse(message.total_alamat)}",
-                  style: TextStyle(fontSize: 15)),
-              Text("Tarif ${rupiah.format(int.parse(message.tarif))}",
+              Text("Tarif ${rupiah.format(double.parse(message.tarif))}",
                   style: TextStyle(fontSize: 15)),
               Text("Pembayaran ${message.pembayaran}",
-                  style: TextStyle(fontSize: 15)),
-              SizedBox(height: 10),
-              Row(
+                  style: TextStyle(fontSize: 15)), */
+              SizedBox(
+                height: 5,
+              ),
+              Card(
+                elevation: 2,
+                child: Container(
+                  padding: EdgeInsets.all(4),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Titik jemput",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 10),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.circle_outlined,
+                              size: 20,
+                              color: Colors.green,
+                            ),
+                            SizedBox(width: 10),
+                            Container(
+                                width: MediaQuery.of(context).size.width / 1.4,
+                                child:
+                                    Text(newLocations[0]["address"].toString()))
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        height: 10,
+                      ),
+                      Text(
+                        "Tujuan",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      LimitedBox(
+                        maxHeight: 60,
+                        child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: newLocations.length - 1,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.only(left: 10, bottom: 5),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.circle_outlined,
+                                      size: 20,
+                                      color: Colors.orange,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Container(
+                                      width: MediaQuery.of(context).size.width /
+                                          1.4,
+                                      child: Text(newLocations[index + 1]
+                                              ["address"]
+                                          .toString()),
+                                    )
+                                  ],
+                                ),
+                              );
+                            }),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 20,
+              ),
+
+              /*   Row(
                 children: List.generate(
                     800 ~/ 10,
                     (index) => Expanded(
@@ -448,30 +910,34 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                             height: 2,
                           ),
                         )),
-              ),
-              Text("Jarak driver ${int.parse(message.jarak_driver) / 1000} km",
-                  style: TextStyle(fontSize: 15)),
-              Text("Waktu jemput ${int.parse(message.waktu_jemput) / 60} mnt",
-                  style: TextStyle(fontSize: 15)),
-              SizedBox(height: 20),
-              Visibility(
-                visible: message.isOpen == true ? true : false,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    MaterialButton(
+              ), */
+              //Text("Jarak driver ${double.parse(message.jarak_driver)} km",
+              //    style: TextStyle(fontSize: 15)),
+              /* Text("Waktu jemput : ${message.waktu_jemput}",
+                  style: TextStyle(fontSize: 15)), */
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Visibility(
+                    visible: message.isOpen == true ? true : false,
+                    child: MaterialButton(
                         padding: EdgeInsets.all(10),
                         color: Colors.greenAccent,
-                        child: Text(
-                          "Accept",
-                        ),
+                        child: Text("Accept"),
                         onPressed: () {
-                          driverRepo.acceptBid(userModel, notifListJob, "",
-                              DriverLatLng(lat: currentLat, lng: currentLng));
+                          driverRepo.acceptBid(
+                              widget.userModel,
+                              notifListJob,
+                              "",
+                              DriverLatLng(lat: currentLat, lng: currentLng),
+                              widget.userModel);
                           //driverRepo.acceptWithoutNego(userModel, notifListJob);
                           showAccept(message, getIndex);
                         }),
-                    MaterialButton(
+                  ),
+                  Visibility(
+                    visible: message.isOpen == true ? true : false,
+                    child: MaterialButton(
                         padding: EdgeInsets.all(10),
                         color: Colors.blueAccent,
                         child: Text(
@@ -480,17 +946,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         onPressed: () {
                           showOfferingDriver(context, message, getIndex);
                         }),
-                    MaterialButton(
-                        padding: EdgeInsets.all(10),
-                        color: Colors.grey,
-                        child: Text(
-                          "Decline",
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                        }),
-                  ],
-                ),
+                  ),
+                  MaterialButton(
+                      padding: EdgeInsets.all(10),
+                      color: Colors.grey,
+                      child: Text(
+                        "Decline",
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          listJobs2[getIndex].isOpen = false;
+                        });
+                        Navigator.pop(context);
+                      }),
+                ],
               )
             ],
           ),
@@ -542,10 +1011,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   keyboardType: TextInputType.phone,
                   onSubmitted: (value) {
                     driverRepo.acceptBid(
-                        userModel,
+                        widget.userModel,
                         notifListJob,
                         offeringController.intValue.toString(),
-                        DriverLatLng(lat: currentLat, lng: currentLng));
+                        DriverLatLng(lat: currentLat, lng: currentLng),
+                        widget.userModel);
                     showAcceptNego(offeringController.text, message, getIndex);
                   },
                 ),
@@ -740,7 +1210,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          IconButton(
+                          Container(
+                            child: foto_akun == ""
+                                ? Icon(
+                                    Icons.account_circle,
+                                    size: 40,
+                                  )
+                                : Image.network(
+                                    "https://asset.smartrans.id/uploads/${foto_akun}"),
+                          ),
+                          /* IconButton(
                               onPressed: () {
                                 slidingDrawerKey.open();
                               },
@@ -751,7 +1230,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                   onPressed: () {},
                                   icon: Icon(Icons.notifications))
                             ],
-                          )
+                          ) */
                         ],
                       ),
                     ],
@@ -866,27 +1345,65 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                           ),
                                         ),
                                         onTap: () {
-                                          if (isOnline) {
-                                            setState(() {
-                                              isOnline = false;
-                                              isOnlineText = "Offline";
-                                              var response =
-                                                  driverRepo.changeStatus(
-                                                      userModel.uid.toString(),
-                                                      "off");
-                                              print(response);
-                                            });
-                                          } else {
-                                            setState(() {
-                                              isOnline = true;
-                                              isOnlineText = "Online";
-                                              var response =
-                                                  driverRepo.changeStatus(
-                                                      userModel.uid.toString(),
-                                                      "on");
-                                              print(response);
-                                            });
-                                          }
+                                          PopupLoading();
+                                          DriverRepo()
+                                              .getProfile()
+                                              .then((value) {
+                                            if (value.dataDriver == null) {
+                                              QuickAlert.show(
+                                                  context: context,
+                                                  type: QuickAlertType.confirm,
+                                                  title:
+                                                      "Data driver anda belum lengkap",
+                                                  barrierDismissible: false,
+                                                  confirmBtnText: "Lengkapi",
+                                                  onConfirmBtnTap: () {
+                                                    Navigator.of(context,
+                                                            rootNavigator: true)
+                                                        .pop();
+                                                    Navigator.pushReplacement(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                            builder: (context) =>
+                                                                BerkasDriver(
+                                                                    //user: widget.user,
+                                                                    userModel:
+                                                                        value)));
+                                                  },
+                                                  cancelBtnText: "Ngga dulu",
+                                                  onCancelBtnTap: () =>
+                                                      Navigator.of(context,
+                                                              rootNavigator:
+                                                                  true)
+                                                          .pop());
+                                            } else {
+                                              if (isOnline) {
+                                                setState(() {
+                                                  isOnline = false;
+                                                  isOnlineText = "Offline";
+                                                  var response =
+                                                      driverRepo.changeStatus(
+                                                          widget.userModel.uid
+                                                              .toString(),
+                                                          "off",
+                                                          area);
+                                                  print(response);
+                                                });
+                                              } else {
+                                                setState(() {
+                                                  isOnline = true;
+                                                  isOnlineText = "Online";
+                                                  var response =
+                                                      driverRepo.changeStatus(
+                                                          widget.userModel.uid
+                                                              .toString(),
+                                                          "on",
+                                                          area);
+                                                  print(response);
+                                                });
+                                              }
+                                            }
+                                          });
                                         }),
                                   ),
                                 ],
@@ -902,65 +1419,69 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               )
             ],
           ),
-          SelectableText(_token.toString()),
+          /* SelectableText(widget.userModel.uid.toString()), */
           Container(
             width: width,
             height: height * 0.75,
-            child: ListView.builder(
-                itemCount: lengthListJobs2,
-                itemBuilder: (context, index) {
-                  return Container(
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(5),
-                          topRight: Radius.circular(35),
-                          bottomLeft: Radius.circular(35),
-                          bottomRight: Radius.circular(5),
-                        ),
-                        color: listJobs2[lengthListJobs2 - 1 - index].isOpen ==
-                                true
-                            ? Colors.lightGreen
-                            : Colors.grey[100]),
-                    margin: EdgeInsets.only(bottom: 5, left: 10, right: 10),
-                    child: ListTile(
-                      onTap: () {
-                        setState(() {
-                          notifListJob = listJobs2[lengthListJobs2 - 1 - index];
-                        });
-                        print(jsonEncode(notifListJob));
-                        showDetailJob(
-                            context,
-                            listJobs2[lengthListJobs2 - 1 - index],
-                            (lengthListJobs2 - 1 - index));
-                      },
-                      trailing: Padding(
-                        padding: const EdgeInsets.only(top: 10, right: 10),
-                        child: Icon(Icons.menu_book),
-                      ),
-                      leading: Padding(
-                        padding: const EdgeInsets.only(top: 10, right: 10),
-                        child: ClipOval(
-                          child: Icon(Icons.person),
-                        ),
-                      ),
-                      title: Text(
-                          "${listJobs2[lengthListJobs2 - 1 - index].nama_user}"),
-                      subtitle: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Tujuan penumpang ${int.parse(listJobs2[lengthListJobs2 - 1 - index].distance) / 1000} km",
+            child: listJobs2.isEmpty
+                ? Container()
+                : ListView.builder(
+                    itemCount: lengthListJobs2,
+                    itemBuilder: (context, index) {
+                      return Container(
+                        decoration: BoxDecoration(
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(5),
+                              topRight: Radius.circular(35),
+                              bottomLeft: Radius.circular(35),
+                              bottomRight: Radius.circular(5),
+                            ),
+                            color:
+                                listJobs2[lengthListJobs2 - 1 - index].isOpen ==
+                                        true
+                                    ? Colors.lightGreen
+                                    : Colors.grey[100]),
+                        margin: EdgeInsets.only(bottom: 5, left: 10, right: 10),
+                        child: ListTile(
+                          onTap: () {
+                            setState(() {
+                              notifListJob =
+                                  listJobs2[lengthListJobs2 - 1 - index];
+                            });
+                            print(jsonEncode(notifListJob));
+                            showDetailJob(
+                                context,
+                                listJobs2[lengthListJobs2 - 1 - index],
+                                (lengthListJobs2 - 1 - index));
+                          },
+                          trailing: Padding(
+                            padding: const EdgeInsets.only(top: 10, right: 10),
+                            child: Icon(Icons.menu_book),
                           ),
-                          Text(
-                              "Tarif ${rupiah.format(int.parse(listJobs2[lengthListJobs2 - 1 - index].tarif))}"),
-                          Text(
-                              "Pickup : ${listJobs2[lengthListJobs2 - 1 - index].waktu_pickup}"),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
+                          leading: Padding(
+                            padding: const EdgeInsets.only(top: 10, right: 10),
+                            child: ClipOval(
+                              child: Icon(Icons.person),
+                            ),
+                          ),
+                          title: Text(
+                              "${listJobs2[lengthListJobs2 - 1 - index].nama_user}"),
+                          subtitle: Column(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Tujuan penumpang ${double.parse(listJobs2[lengthListJobs2 - 1 - index].distance) / 1000} km",
+                              ),
+                              Text(
+                                  "Tarif ${rupiah.format(double.parse(listJobs2[lengthListJobs2 - 1 - index].tarif))}"),
+                              Text(
+                                  "Pickup : ${listJobs2[lengthListJobs2 - 1 - index].waktu_pickup}"),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
           ),
         ],
       ),
@@ -996,7 +1517,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   homeDriver(),
                   HistoryScreen(),
                   WalletScreen(),
-                  ProfileScreen(userModel: userModel)
+                  ProfileScreen()
                 ],
               );
             }),
@@ -1051,9 +1572,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         },
         drawerBuilder: (_) {
           return SideMenu(
-              onAction: () => slidingDrawerKey.close(),
-              user: widget.user,
-              isDriver: widget.isDriver);
+            onAction: () => slidingDrawerKey.close(),
+            userModel: widget.userModel,
+            isDriver: widget.isDriver,
+            area: latestArea,
+          );
         },
       ),
     );

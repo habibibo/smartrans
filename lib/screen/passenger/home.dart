@@ -23,9 +23,12 @@ import 'package:logo_n_spinner/logo_n_spinner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signgoogle/bloc/auth/auth_bloc.dart';
 import 'package:signgoogle/bloc/passenger/passenger_bloc.dart';
+import 'package:signgoogle/component/popup_loading.dart';
 import 'package:signgoogle/main.dart';
 import 'package:signgoogle/model/notif/notif_list_job.dart';
 import 'package:signgoogle/model/user.dart';
+import 'package:signgoogle/repo/smartrans_cache.dart';
+import 'package:signgoogle/screen/passenger/dashboard.dart';
 import 'package:signgoogle/screen/passenger/profile.dart';
 import 'package:signgoogle/screen/passenger/ride.dart';
 //import 'package:signgoogle/screens/home/member/member_home.dart';
@@ -93,9 +96,10 @@ void notificationTapBackground(NotificationResponse notificationResponse) {
 } */
 
 class PassengerHome extends StatefulWidget {
-  PassengerHome({Key? key, required this.user, required this.isDriver})
+  PassengerHome({Key? key, required this.userModel, required this.isDriver})
       : super(key: key);
-  GoogleSignInAccount? user;
+  //GoogleSignInAccount? user;
+  UserModel userModel;
   final bool isDriver;
   @override
   State<PassengerHome> createState() => _PassengerHomeState();
@@ -104,10 +108,12 @@ class PassengerHome extends StatefulWidget {
 class _PassengerHomeState extends State<PassengerHome> {
   late AuthRepository authRepository = AuthRepository();
   late GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  UserModel userModel = UserModel();
   @override
   void initState() {
     super.initState();
     WidgetsFlutterBinding.ensureInitialized();
+
     //setupInteractedMessage();
   }
 
@@ -123,11 +129,9 @@ class _PassengerHomeState extends State<PassengerHome> {
         onWillPop: () => getPassengerHome(),
         child: MaterialApp(
           home: BlocProvider(
-            create: (context) => AuthBloc(
-                authRepository: authRepository, navigatorKey: navigatorKey)
-              ..add(AppStarted()),
+            create: (context) => PassengerBloc()..add(PassengerStart()),
             child: PassengerHomeScreen(
-              user: widget.user,
+              userModel: widget.userModel,
               isDriver: widget.isDriver,
             ),
           ),
@@ -136,9 +140,11 @@ class _PassengerHomeState extends State<PassengerHome> {
 }
 
 class PassengerHomeScreen extends StatefulWidget {
-  PassengerHomeScreen({Key? key, required this.user, required this.isDriver})
+  PassengerHomeScreen(
+      {Key? key, required this.userModel, required this.isDriver})
       : super(key: key);
-  GoogleSignInAccount? user;
+  //GoogleSignInAccount? user;
+  UserModel userModel;
   final bool isDriver;
 
   @override
@@ -176,16 +182,20 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
   final AuthRepository authRepository = AuthRepository();
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey();
   TextEditingController dateBirthController = TextEditingController();
-
+  PassengerBloc passengerBloc = PassengerBloc();
+  String foto_akun = "";
   @override
   void initState() {
     super.initState();
     WidgetsFlutterBinding.ensureInitialized();
-    getUserCache();
+    /* final jsonUserModel = jsonEncode(widget.userModel.toJson());
+    foto_akun =
+        jsonDecode(jsonDecode(jsonUserModel)["data_account"])["foto_akun"]; */
+    //getUserCache();
     _pageController = PageController(initialPage: _page);
   }
 
-  Future<void> getUserCache() async {
+  /* Future<void> getUserCache() async {
     SharedPreferences cacheUser = await SharedPreferences.getInstance();
     userModel.id = jsonDecode(cacheUser.get("userModel").toString())["id"];
     userModel.email =
@@ -209,9 +219,9 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
         jsonDecode(cacheUser.get("userModel").toString())["token"];
     dateBirthController.text =
         jsonDecode(userModel.dataAccount.toString())["tanggal_lahir"];
+    SmartransCache().getUserModel(widget.user!.id);
     print("data akun dari home");
-    print(userModel.dataAccount);
-  }
+  } */
 
   late AnimationController _animationController;
   Widget homeWidget() {
@@ -314,7 +324,8 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                                                 MaterialPageRoute(
                                                     builder: (context) =>
                                                         PassengerRide(
-                                                          user: widget.user,
+                                                          userModel:
+                                                              widget.userModel,
                                                         )));
                                           },
                                           padding: EdgeInsets.all(0.0),
@@ -500,90 +511,6 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
     );
   }
 
-/*
-  Widget profileScreen() {
-    return Container(
-      margin: EdgeInsets.only(top: 30, left: 5, right: 5),
-      child: Column(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-                borderRadius: BorderRadius.all(Radius.circular(15)),
-                color: primaryColor),
-            child: Card(
-              color: primaryColor,
-              child: Container(
-                padding: EdgeInsets.only(
-                  left: 8,
-                  right: 15,
-                  top: 10,
-                  bottom: 10,
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                        child: ListTile(
-                      leading: ClipOval(
-                        child: Container(
-                          child: Image.network(jsonDecode(
-                              userModel.dataAccount.toString())["foto_akun"]),
-                          /* child: Image.network(jsonDecode(
-                              userModel.dataAccount.toString())["foto_akun"]), */
-                        ),
-                      ),
-                      title: Text(userModel.email.toString()),
-                    )),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          SizedBox(
-            height: 10,
-          ),
-          Container(
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [Text("Data pribadi")],
-                    ),
-                    SizedBox(
-                      height: 10,
-                    ),
-                    Container(
-                      child: TextField(
-                        controller: dateBirthController,
-                        readOnly: true,
-                        onTap: () async {
-                          DateTime? dateTime = await showDatePicker(
-                              onDatePickerModeChange: (value) {
-                                setState(() {
-                                  dateBirthController.text = value.toString();
-                                });
-                              },
-                              context: context,
-                              initialDate: DateTime.now(),
-                              firstDate: DateTime(1950),
-                              //DateTime.now() - not to allow to choose before today.
-                              lastDate: DateTime(2100));
-                          print(dateTime);
-                          
-                        },
-                      ),
-                    )
-                  ],
-                ),
-              ),
-            ),
-          )
-        ],
-      ),
-    );
-  }
-*/
   @override
   Widget build(BuildContext context) {
     width = MediaQuery.of(context).size.width;
@@ -598,18 +525,28 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
         key: slidingDrawerKey,
         // Build content widget
         contentBuilder: (context) {
-          return BlocProvider<AuthBloc>(
-              create: (context) => AuthBloc(
-                  authRepository: authRepository, navigatorKey: navigatorKey)
-                ..add(AppStarted()),
-              child: Scaffold(
-                body:
-                    BlocBuilder<AuthBloc, AuthState>(builder: (context, state) {
-                  if (state is Unauthenticated) {
-                    return MyApp(
-                        authRepository: authRepository,
-                        navigatorKey: navigatorKey);
-                  }
+          return Scaffold(
+            body: /* PageView(
+              controller: _pageController,
+              onPageChanged: (int index) {
+                setState(() {
+                  _page = index;
+                });
+              },
+              children: [
+                DashboardPassenger(userModel: userModel),
+                historyScreen(),
+                ProfileScreen(userModel: userModel)
+              ],
+            ), */
+
+                BlocBuilder<PassengerBloc, PassengerState>(
+              builder: (context, state) {
+                if (state is PassengerLoadingState) {
+                  return PopupLoading();
+                }
+                if (state is GetUserModel) {
+                  print("from home ${jsonEncode(state.userModel)}");
                   return PageView(
                     controller: _pageController,
                     onPageChanged: (int index) {
@@ -618,60 +555,71 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                       });
                     },
                     children: [
-                      homeWidget(),
+                      DashboardPassenger(userModel: state.userModel),
                       historyScreen(),
-                      ProfileScreen(userModel: userModel)
+                      ProfileScreen()
                     ],
                   );
-                }),
-                bottomNavigationBar: CurvedNavigationBar(
-                  color: Colors.white,
-                  buttonBackgroundColor: primaryColor,
-                  backgroundColor: Color.fromARGB(255, 241, 241, 241),
-                  key: _bottomNavigationKey,
-                  index: _page,
-                  onTap: (index) {
-                    setState(() {
-                      _page = index;
-                    });
-                    _pageController.animateToPage(
-                      index,
-                      duration: Duration(milliseconds: 300),
-                      curve: Curves.easeInOutCubic,
-                    );
-                  },
-                  items: [
-                    CurvedNavigationBarItem(
-                      child: Icon(
-                        Icons.home_outlined,
-                        grade: 10,
-                      ),
-                      label: 'Home',
-                    ),
-                    CurvedNavigationBarItem(
-                      child: Icon(
-                        Icons.menu_book,
-                        grade: 10,
-                      ),
-                      label: 'History',
-                    ),
-                    CurvedNavigationBarItem(
-                      child: Icon(
-                        Icons.account_box,
-                        grade: 10,
-                      ),
-                      label: 'My Account',
-                    ),
-                  ],
+                }
+                return Center(
+                  child: Text("Unable load data"),
+                );
+              },
+            ),
+            bottomNavigationBar: CurvedNavigationBar(
+              color: Colors.white,
+              buttonBackgroundColor: primaryColor,
+              backgroundColor: Color.fromARGB(255, 241, 241, 241),
+              key: _bottomNavigationKey,
+              index: _page,
+              onTap: (index) {
+                setState(() {
+                  _page = index;
+                  _pageController.animateToPage(
+                    index,
+                    duration: Duration(milliseconds: 300),
+                    curve: Curves.easeInOutCubic,
+                  );
+                });
+              },
+              items: [
+                CurvedNavigationBarItem(
+                  child: Icon(
+                    Icons.home_outlined,
+                    grade: 10,
+                  ),
+                  label: 'Home',
                 ),
-              ));
+                CurvedNavigationBarItem(
+                  child: Icon(
+                    Icons.menu_book,
+                    grade: 10,
+                  ),
+                  label: 'History',
+                ),
+                CurvedNavigationBarItem(
+                  child: Icon(
+                    Icons.account_box,
+                    grade: 10,
+                  ),
+                  label: 'My Account',
+                ),
+              ],
+            ),
+          );
         },
         drawerBuilder: (_) {
-          return SideMenu(
-            onAction: () => slidingDrawerKey.close(),
-            user: widget.user,
-            isDriver: widget.isDriver,
+          return Container(
+            child: foto_akun == ""
+                ? Icon(Icons.person_2_outlined)
+                : Image.network(
+                    "https://asset.smartrans.id/uploads/${foto_akun}"),
           );
+          /* SideMenu(
+            onAction: () => slidingDrawerKey.close(),
+            userModel: widget.userModel,
+            isDriver: widget.isDriver,
+          ); */
         },
       ),
     );
@@ -679,6 +627,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
 
   @override
   void dispose() {
+    PassengerBloc().close();
     _pageController.dispose();
     super.dispose();
   }

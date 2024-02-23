@@ -10,6 +10,7 @@ import 'package:logo_n_spinner/logo_n_spinner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signgoogle/bloc/auth/auth_bloc.dart';
 import 'package:signgoogle/main.dart';
+import 'package:signgoogle/model/user.dart';
 import 'package:signgoogle/repo/Authentication.dart';
 import 'package:signgoogle/repo/driver.dart';
 import 'package:signgoogle/screen/driver/home.dart';
@@ -18,14 +19,17 @@ import 'package:signgoogle/utils/SmartransColor.dart';
 
 class SideMenu extends StatefulWidget {
   //const SideMenu({Key? key, required this.onAction, required this.user}) : super(key: key);
-  SideMenu(
-      {Key? key,
-      required this.onAction,
-      required this.user,
-      required this.isDriver})
-      : super(key: key);
-  GoogleSignInAccount? user;
+  SideMenu({
+    Key? key,
+    required this.onAction,
+    required this.userModel,
+    required this.isDriver,
+    required this.area,
+  }) : super(key: key);
+  //GoogleSignInAccount? user;
+  UserModel userModel;
   bool isDriver;
+  String area;
   //final User user;
   final VoidCallback onAction;
   @override
@@ -61,9 +65,84 @@ class _SideMenuState extends State<SideMenu> {
                     child: Column(
                       children: [
                         //_MenuHeader(onPress: widget.onAction),
-                        _MenuHeader(
+                        /* _MenuHeader(
                           user: widget.user,
                           isDriver: widget.isDriver,
+                        ), */
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Align(
+                            alignment: Alignment.topLeft,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(32),
+                                  child: Container(
+                                    width: 64,
+                                    height: 64,
+                                    color: const Color(0xFFBDBDBD),
+                                    child: /*  user!.photoUrl != null
+                    ? ClipOval(
+                        child: Material(
+                          shadowColor: Colors.grey,
+                          color: Colors.blue,
+                          child: Image.network(
+                            user!.photoUrl!,
+                            fit: BoxFit.fitHeight,
+                            height: 45,
+                          ),
+                        ),
+                      )
+                    :  */
+                                        ClipOval(
+                                      child: Material(
+                                        color: Colors.grey,
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16.0),
+                                          child: Icon(
+                                            Icons.person,
+                                            size: 35,
+                                            color: Colors.orange,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Container(
+                                    margin: EdgeInsets.only(top: 15),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          widget.userModel.email.toString(),
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          widget.userModel.email.toString(),
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                         /* _MenuContent(
                           user: widget.user, isDriver: widget.isDriver), */
@@ -94,6 +173,9 @@ class _SideMenuState extends State<SideMenu> {
                                   onPress: () async {
                                     //authBloc.add(LoggedOut());
                                     print("logout");
+                                    SharedPreferences userCache =
+                                        await SharedPreferences.getInstance();
+                                    await userCache.clear();
                                     await authRepository.signOutFromGoogle();
                                     Future.delayed(Duration(seconds: 2), () {
                                       Navigator.pushReplacement(
@@ -135,7 +217,8 @@ class _SideMenuState extends State<SideMenu> {
                                               .toString();
                                           driverRepo.changeStatus(
                                               jsonDecode(getUser)["uid"],
-                                              "off");
+                                              "off",
+                                              widget.area);
                                           setState(() {
                                             isLoading = true;
                                           });
@@ -148,7 +231,8 @@ class _SideMenuState extends State<SideMenu> {
                                                 MaterialPageRoute(
                                                     builder: (context) =>
                                                         PassengerHome(
-                                                            user: widget.user,
+                                                            userModel: widget
+                                                                .userModel,
                                                             isDriver: false)));
                                           });
                                         },

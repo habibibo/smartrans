@@ -9,9 +9,11 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logo_n_spinner/logo_n_spinner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signgoogle/bloc/auth/auth_bloc.dart';
+import 'package:signgoogle/bloc/passenger/passenger_bloc.dart';
 import 'package:signgoogle/main.dart';
 import 'package:signgoogle/model/user.dart';
 import 'package:signgoogle/repo/Authentication.dart';
+import 'package:signgoogle/repo/driver.dart';
 import 'package:signgoogle/screen/driver/berkas_driver.dart';
 import 'package:signgoogle/screen/driver/home.dart';
 import 'package:signgoogle/utils/SmartransColor.dart';
@@ -22,10 +24,11 @@ class SideMenu extends StatefulWidget {
   SideMenu(
       {Key? key,
       required this.onAction,
-      required this.user,
+      required this.userModel,
       required this.isDriver})
       : super(key: key);
-  GoogleSignInAccount? user;
+  //GoogleSignInAccount? user;
+  UserModel userModel;
   bool isDriver;
 
   //final User user;
@@ -38,6 +41,7 @@ class SideMenu extends StatefulWidget {
 class _SideMenuState extends State<SideMenu> {
   //late User user;
   bool isLoading = false;
+  PassengerBloc passengerBloc = PassengerBloc();
 
   final AuthRepository authRepository = AuthRepository();
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey();
@@ -64,7 +68,82 @@ class _SideMenuState extends State<SideMenu> {
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     child: Column(
                       children: [
-                        _MenuHeader(user: widget.user),
+                        //_MenuHeader(user: widget.userModel),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Align(
+                            alignment: Alignment.topLeft,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(32),
+                                  child: Container(
+                                    width: 64,
+                                    height: 64,
+                                    color: const Color(0xFFBDBDBD),
+                                    child: /* user!.photoUrl != null
+                    ? ClipOval(
+                        child: Material(
+                          shadowColor: Colors.grey,
+                          color: Colors.blue,
+                          child: Image.network(
+                            user!.photoUrl!,
+                            fit: BoxFit.fitHeight,
+                            height: 45,
+                          ),
+                        ),
+                      )
+                    :  */
+                                        ClipOval(
+                                      child: Material(
+                                        color: Colors.grey,
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16.0),
+                                          child: Icon(
+                                            Icons.person,
+                                            size: 35,
+                                            color: Colors.orange,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Container(
+                                    margin: EdgeInsets.only(top: 15),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          widget.userModel.email.toString(),
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          widget.userModel.email.toString(),
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                         /* _MenuContent(
                           user: widget.user,
                           isDriver: widget.isDriver,
@@ -95,6 +174,9 @@ class _SideMenuState extends State<SideMenu> {
                                   onPress: () async {
                                     //authBloc.add(LoggedOut());
                                     print("logout");
+                                    SharedPreferences userCache =
+                                        await SharedPreferences.getInstance();
+                                    await userCache.clear();
                                     await authRepository.signOutFromGoogle();
                                     Future.delayed(Duration(seconds: 2), () {
                                       Navigator.pushReplacement(
@@ -130,73 +212,21 @@ class _SideMenuState extends State<SideMenu> {
                                           setState(() {
                                             isLoading = true;
                                           });
-                                          late UserModel userModel =
-                                              UserModel();
-                                          SharedPreferences cacheUser =
-                                              await SharedPreferences
-                                                  .getInstance();
-                                          userModel.id = jsonDecode(cacheUser
-                                              .get("userModel")
-                                              .toString())["id"];
-                                          userModel.email = jsonDecode(cacheUser
-                                              .get("userModel")
-                                              .toString())["email"];
-                                          userModel.uid = jsonDecode(cacheUser
-                                              .get("userModel")
-                                              .toString())["uid"];
-                                          userModel.deposit = jsonDecode(
-                                              cacheUser
-                                                  .get("userModel")
-                                                  .toString())["deposit"];
-                                          userModel.dataDriver = jsonDecode(
-                                              cacheUser
-                                                  .get("userModel")
-                                                  .toString())["data_driver"];
-                                          userModel.dataAccount = jsonDecode(
-                                              cacheUser
-                                                  .get("userModel")
-                                                  .toString())["data_account"];
-                                          userModel.location = jsonDecode(
-                                              cacheUser
-                                                  .get("userModel")
-                                                  .toString())["location"];
-                                          userModel.point = jsonDecode(cacheUser
-                                              .get("userModel")
-                                              .toString())["point"];
-                                          userModel.transaction = jsonDecode(
-                                              cacheUser
-                                                  .get("userModel")
-                                                  .toString())["transaction"];
-                                          userModel.rating = jsonDecode(
-                                              cacheUser
-                                                  .get("userModel")
-                                                  .toString())["rating"];
-                                          userModel.token = jsonDecode(cacheUser
-                                              .get("userModel")
-                                              .toString())["token"];
-                                          Future.delayed(Duration(seconds: 2),
-                                              () {
-                                            isLoading = false;
-                                            //authBloc.add(GoingDriver());
 
-                                            if (userModel.dataDriver == null) {
-                                              Navigator.pushReplacement(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          BerkasDriver(
-                                                              user: widget.user,
-                                                              userModel:
-                                                                  userModel)));
-                                            } else {
-                                              Navigator.pushReplacement(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          DriverHome(
-                                                              user: widget.user,
-                                                              isDriver: true)));
-                                            }
+                                          DriverRepo()
+                                              .getProfile()
+                                              .then((value) {
+                                            setState(() {
+                                              isLoading = false;
+                                            });
+                                            Navigator.pushReplacement(
+                                                context,
+                                                MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        DriverHome(
+                                                            //user: widget.user,
+                                                            userModel: value,
+                                                            isDriver: true)));
                                           });
                                         },
                                       ),

@@ -16,6 +16,8 @@ class DriverBid {
   String? jarakDriver;
   String? waktuJemput;
   String? pembayaran;
+  String? tokenUser;
+  String? tokenDriver;
 
   DriverBid(
       {this.idPassenger,
@@ -32,7 +34,9 @@ class DriverBid {
       this.bid,
       this.jarakDriver,
       this.waktuJemput,
-      this.pembayaran});
+      this.pembayaran,
+      this.tokenUser,
+      this.tokenDriver});
 
   DriverBid.fromJson(Map<String, dynamic> json) {
     idPassenger = json['id_passenger'];
@@ -50,6 +54,8 @@ class DriverBid {
     jarakDriver = json['jarak_driver'];
     waktuJemput = json['waktu_jemput'];
     pembayaran = json['pembayaran'];
+    tokenUser = json['token_user'];
+    tokenDriver = json['token_driver'];
   }
 
   Map<String, dynamic> toJson() {
@@ -69,6 +75,8 @@ class DriverBid {
     data['jarak_driver'] = this.jarakDriver;
     data['waktu_jemput'] = this.waktuJemput;
     data['pembayaran'] = this.pembayaran;
+    data['token_user'] = this.tokenUser;
+    data['token_driver'] = this.tokenDriver;
     return data;
   }
 }

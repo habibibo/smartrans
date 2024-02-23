@@ -1,4 +1,5 @@
 class Transaction {
+  String? uid;
   String? nowlater;
   String? waktuPickup;
   String? notes;
@@ -10,9 +11,11 @@ class Transaction {
   String? area;
   String? paymentmethod;
   String? promo;
+  String? geofence;
 
   Transaction(
-      {this.nowlater,
+      {this.uid,
+      this.nowlater,
       this.waktuPickup,
       this.notes,
       this.addons,
@@ -22,9 +25,11 @@ class Transaction {
       this.qty,
       this.area,
       this.paymentmethod,
-      this.promo});
+      this.promo,
+      this.geofence});
 
   Transaction.fromJson(Map<String, dynamic> json) {
+    uid = json['uid'].toString();
     nowlater = json['nowlater'].toString();
     waktuPickup = json['waktu_pickup'].toString();
     notes = json['notes'].toString();
@@ -36,10 +41,12 @@ class Transaction {
     area = json['area'].toString();
     paymentmethod = json['paymentmethod'].toString();
     promo = json['promo'].toString();
+    geofence = json['geofence'].toString();
   }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = new Map<String, dynamic>();
+    data['uid'] = this.uid;
     data['nowlater'] = this.nowlater;
     data['waktu_pickup'] = this.waktuPickup;
     data['notes'] = this.notes;
@@ -51,6 +58,7 @@ class Transaction {
     data['area'] = this.area;
     data['paymentmethod'] = this.paymentmethod;
     data['promo'] = this.promo;
+    data['geofence'] = this.geofence;
     return data;
   }
 }

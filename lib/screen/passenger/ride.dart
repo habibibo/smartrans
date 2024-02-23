@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:signgoogle/bloc/auth/auth_bloc.dart';
 import 'package:signgoogle/model/fitur.dart';
+import 'package:signgoogle/model/user.dart';
 import 'package:signgoogle/screen/passenger/choose_driver.dart';
 import 'package:signgoogle/utils/SmartransColor.dart';
 
@@ -24,8 +25,9 @@ import 'package:latlong2/latlong.dart';
 class PassengerRide extends StatefulWidget {
   //PassengerRide({Key? key, required this.getContecxt, required this.getAuth})
   //    : super(key: key);
-  PassengerRide({Key? key, required this.user}) : super(key: key);
-  GoogleSignInAccount? user;
+  PassengerRide({Key? key, required this.userModel}) : super(key: key);
+  //GoogleSignInAccount? user;
+  UserModel userModel;
   @override
   State<PassengerRide> createState() => _PassengerRideState();
 }
@@ -273,7 +275,7 @@ class _PassengerRideState extends State<PassengerRide> {
     //getCurrentUser();
     _getCurrentLocation();
     print("passenger");
-    print(widget.user);
+    print(jsonEncode(widget.userModel));
   }
 
 /* 
@@ -452,11 +454,12 @@ class _PassengerRideState extends State<PassengerRide> {
   Future<void> getScheduleCar(
       List<flutterMapDirection.LatLng> directionDestLatLngs,
       List<LatLng> dataLatLngs) async {
-    /* double getDisatance = Geolocator.distanceBetween(
+    //Geolocator.
+    Geolocator.distanceBetween(
         directionDestLatLngs.first.latitude.toDouble(),
         directionDestLatLngs.first.longitude.toDouble(),
         directionDestLatLngs.last.latitude.toDouble(),
-        directionDestLatLngs.last.longitude.toDouble()); */
+        directionDestLatLngs.last.longitude.toDouble());
     Uri getTrafficeUrl = Uri.parse(
         "https://api.mapbox.com/directions/v5/mapbox/driving/${directionDestLatLngs.first.longitude}%2C${directionDestLatLngs.first.latitude}%3B${directionDestLatLngs.last.longitude}%2C${directionDestLatLngs.last.latitude}?alternatives=true&geometries=geojson&language=en&overview=full&steps=true&access_token=${accessTokenMapBox}");
     var getTraffice = await http.get(getTrafficeUrl);
@@ -513,15 +516,18 @@ class _PassengerRideState extends State<PassengerRide> {
         context,
         MaterialPageRoute(
             builder: (context) => ChooseDriver(
-                locations: locations,
-                duration: duration,
-                bearing: bearing,
-                user: widget.user,
-                directionLatLng: directionDestLatLngs,
-                features: features,
-                distance: (double.parse(duration) / 1000)
-                    .toStringAsFixed(2)
-                    .toString())));
+                  locations: locations,
+                  duration: duration,
+                  bearing: bearing,
+                  //user: widget.user,
+                  userModel: widget.userModel,
+                  directionLatLng: directionDestLatLngs,
+                  features: features,
+                  distance: (double.parse(duration) / 1000)
+                      .toStringAsFixed(2)
+                      .toString(),
+                  area: area,
+                )));
     /* for (int i = 0; i <= features.length - 1; i++) {
         print(json.decode(response.body)["data"]["fitur"][i]["fitur"]);
       } */
@@ -1075,7 +1081,7 @@ class _PassengerRideState extends State<PassengerRide> {
                                   SizedBox(width: 20),
                                   Container(
                                     height: 50,
-                                    width: width * 0.65,
+                                    width: width * 0.60,
                                     child: TextField(
                                         decoration: InputDecoration(
                                             border: InputBorder.none,

@@ -37,8 +37,8 @@ class LoginRepo {
         String messageData = data['message'];
         print("messageData ${messageData}");
         if (messageData != "notfound") {
-          final UserModel userModel = UserModel(
-              id: data["data"]["id"],
+          /* final UserModel userModel = UserModel(
+              id: "0",
               uid: data["data"]["uid"],
               email: data["data"]["email"],
               token: await FirebaseMessaging.instance.getToken(),
@@ -50,13 +50,14 @@ class LoginRepo {
               deposit: data["data"]["deposit"],
               transaction: data["data"]["transaction"],
               point: data["data"]["point"]);
-          cacheUserModel.setString("userModel", jsonEncode(userModel));
+          cacheUserModel.setString("userModel", jsonEncode(userModel)); */
           updateUser(data["data"]);
           print("cache user model");
-          print(cacheUserModel.get("userModel"));
+          // print(cacheUserModel.get("userModel"));
           return true;
         } else {
           final registerData = {
+            "uid": user.id,
             "email": user.email,
             "username": user.email,
             "name": user.displayName,
@@ -80,7 +81,7 @@ class LoginRepo {
             body: jsonEncode(registerData),
           );
           var registerUserResponse = jsonDecode(registerUser.body);
-          final UserModel userModel = UserModel(
+          /* final UserModel userModel = UserModel(
               id: registerUserResponse["data"]["id"],
               uid: registerUserResponse["data"]["uid"],
               email: registerUserResponse["data"]["email"],
@@ -93,8 +94,8 @@ class LoginRepo {
               deposit: registerUserResponse["data"]["deposit"],
               transaction: registerUserResponse["data"]["transaction"],
               point: registerUserResponse["data"]["point"]);
-          cacheUserModel.setString("userModel", jsonEncode(userModel));
-          print(cacheUserModel.get("userModel"));
+          cacheUserModel.setString("userModel", jsonEncode(userModel)); */
+          print(registerUserResponse);
           return true;
         }
       } else {
@@ -109,7 +110,7 @@ class LoginRepo {
     }
   }
 
-  Future<void> updateUser(var userData) async {
+  Future<dynamic> updateUser(var userData) async {
     final data = {
       "id": userData["id"],
       "uid": userData["uid"],
@@ -125,7 +126,7 @@ class LoginRepo {
       "point": userData["point"]
     };
     var updateUrl = Uri.parse("${ApiNetwork().baseUrl}${To().updateUser}");
-    await http.post(
+    final response = await http.post(
       updateUrl,
       headers: <String, String>{
         'Authorization': basicAuth,
@@ -135,8 +136,9 @@ class LoginRepo {
       //body: jsonEncode(<String, String>{'email': user!.email.toString()}),
       body: jsonEncode(data),
     );
-    SharedPreferences cacheUserModel = await SharedPreferences.getInstance();
-    cacheUserModel.setString("userModel", jsonEncode(data));
+    /* SharedPreferences cacheUserModel = await SharedPreferences.getInstance();
+    cacheUserModel.setString("userModel", jsonEncode(data)); */
     print(userData["data_driver"]);
+    return jsonDecode(response.body);
   }
 }

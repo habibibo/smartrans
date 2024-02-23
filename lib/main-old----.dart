@@ -11,22 +11,23 @@ import 'package:signgoogle/utils/SmartransColor.dart';
 
 import 'bloc/googlesign/google_sign_bloc.dart';
 
-void main() {
+void mains() {
   WidgetsFlutterBinding.ensureInitialized();
   final AuthRepository authRepository = AuthRepository();
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-  runApp(MyApp(authRepository: authRepository, navigatorKey: navigatorKey));
+  runApp(
+      MyAppSecond(authRepository: authRepository, navigatorKey: navigatorKey));
   // runApp(const MyApp());
 }
 
 final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-class MyApp extends StatelessWidget {
+class MyAppSecond extends StatelessWidget {
   final AuthRepository authRepository;
   final GlobalKey<NavigatorState> navigatorKey;
 
-  const MyApp(
+  const MyAppSecond(
       {Key? key, required this.authRepository, required this.navigatorKey})
       : super(key: key);
 
