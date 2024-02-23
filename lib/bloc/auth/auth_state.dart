@@ -6,8 +6,9 @@ sealed class AuthState {}
 final class AuthInitial extends AuthState {}
 
 class Authenticated extends AuthState {
-  Authenticated({required this.user, required this.isDriver});
-  GoogleSignInAccount? user;
+  Authenticated({required this.userModel, required this.isDriver});
+  //GoogleSignInAccount? user;
+  UserModel userModel;
   bool isDriver;
 }
 

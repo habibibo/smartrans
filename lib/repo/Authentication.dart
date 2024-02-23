@@ -10,7 +10,7 @@ class AuthRepository {
   Future<void> signInWithGoogle() async {
     try {
       final user = await _googleSignIn.signIn();
-      print(user);
+      //print(user);
     } catch (error) {
       throw Exception('Error signing in with Google: $error');
     }

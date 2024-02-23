@@ -324,8 +324,10 @@ class _HomeScreenState extends State<HomeScreen> {
           } else if (state is Authenticated) {
             //return _buildLoggedInUI(context, authBloc);
             return state.isDriver
-                ? DriverHome(user: state.user, isDriver: state.isDriver)
-                : PassengerHome(user: state.user, isDriver: state.isDriver);
+                ? DriverHome(
+                    userModel: state.userModel, isDriver: state.isDriver)
+                : PassengerHome(
+                    userModel: state.userModel, isDriver: state.isDriver);
           } else if (state is Unauthenticated) {
             return _buildLoggedOutUI(context, authBloc);
           } else {

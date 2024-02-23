@@ -1,662 +1,599 @@
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:accordion/accordion.dart';
-import 'package:accordion/controllers.dart';
+import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http_parser/http_parser.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:intl_phone_field/intl_phone_field.dart';
-import 'package:intl_phone_field/phone_number.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_country_code_picker/flutter_country_code_picker.dart';
 import 'package:logo_n_spinner/logo_n_spinner.dart';
-import 'package:mime/mime.dart';
 import 'package:phonecodes/phonecodes.dart';
 import 'package:quickalert/models/quickalert_type.dart';
 import 'package:quickalert/widgets/quickalert_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:signgoogle/bloc/auth/auth_bloc.dart';
+//import 'package:signgoogle/bloc/driver/passenger_bloc.dart';
+import 'package:signgoogle/component/popup_loading.dart';
+import 'package:signgoogle/main.dart';
 import 'package:signgoogle/model/dokumen_driver.dart';
 import 'package:signgoogle/model/kendaraan_driver.dart';
 import 'package:signgoogle/model/user.dart';
+import 'package:signgoogle/repo/Authentication.dart';
 import 'package:signgoogle/repo/passenger.dart';
 import 'package:signgoogle/repo/login.dart';
+import 'package:signgoogle/screen/driver/berkas_driver.dart';
+import 'package:signgoogle/screen/driver/home.dart';
+import 'package:signgoogle/screen/driver/profile_edit.dart';
+import 'package:signgoogle/screen/passenger/home.dart';
 import 'package:signgoogle/utils/SmartransColor.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
+import 'package:signgoogle/utils/api.dart';
 import 'package:signgoogle/utils/basic_auth.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final UserModel userModel;
-  const ProfileScreen({Key? key, required this.userModel}) : super(key: key);
+  //UserModel userModel;
+  ProfileScreen({Key? key}) : super(key: key);
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class SelectOption {
-  final String label;
-  final String value;
-
-  SelectOption({required this.label, required this.value});
-}
-
 class _ProfileScreenState extends State<ProfileScreen> {
   TextEditingController dateBirthController = TextEditingController();
   TextEditingController phoneController = TextEditingController();
+
+  String? phoneInit = "";
   String countryCode = "";
   String foto_akun = "";
-  TextEditingController nidController = TextEditingController();
-  TextEditingController jenis_dokumenController = TextEditingController();
-  TextEditingController datevalidController = TextEditingController();
-  TextEditingController keterangan_dokumenController = TextEditingController();
-  TextEditingController statusController = TextEditingController();
-  TextEditingController uploadImageController = TextEditingController();
-  String responseImage = "";
-  final List<SelectOption> utilityDriver = [
-    SelectOption(label: 'Dokumen Driver', value: 'dokumen_driver'),
-    SelectOption(label: 'Kendaraan Driver', value: 'kendaraan_driver'),
-  ];
-  final List<SelectOption> categoryDocuments = [
-    SelectOption(label: 'KTP', value: 'KTP'),
-    SelectOption(label: 'SIM A', value: 'SIM_A'),
-    SelectOption(label: 'SIM B', value: 'SIM_B'),
-    SelectOption(label: 'SIM C', value: 'SIM_C'),
-  ];
-
-  SelectOption? selectedOption;
-  SelectOption? categoryDocument;
-  List<DokumenDriver> newListDokumenDriver = [];
-  List<KendaraanDriver> newListKendaraanDriver = [];
+  String dateBirth = "";
+  String accountStatus = "";
+  String accountMode = "";
+  String userName = "";
+  List<DokumenDriver> driverDocuments = [];
+  List<KendaraanDriver> driverVehicles = [];
+  var jsonUserModel = "";
   @override
   void initState() {
     super.initState();
-    var jsonUserModel = jsonEncode(widget.userModel.toJson());
-    print(jsonDecode(jsonDecode(jsonUserModel)["data_account"])["phone"]
-        ["countrycode"]);
-
-    dateBirthController.text =
-        jsonDecode(jsonDecode(jsonUserModel)["data_account"])["tanggal_lahir"];
-    countryCode = jsonDecode(jsonDecode(jsonUserModel)["data_account"])["phone"]
-        ["countrycode"];
-    print(Countries.findByDialCode("+${countryCode}").first.flag);
-    phoneController.text =
-        jsonDecode(jsonDecode(jsonUserModel)["data_account"])["phone"]
-            ["phoneno"];
-    foto_akun =
-        jsonDecode(jsonDecode(jsonUserModel)["data_account"])["foto_akun"];
-    //print(jsonDecode(widget.userModel.dataAccount.toString())["phone"]
-    //    ["phoneno"]);
-    jenis_dokumenController.text = categoryDocuments[0].value;
-    print(jsonDecode(jsonUserModel)["data_driver"]);
-
-    var decode = jsonDecode(widget.userModel.dataDriver.toString());
-    List<dynamic> jsonDokumen = json.decode(decode["dokumen_driver"]);
-    List<dynamic> jsonKendaraan = json.decode(decode["kendaraan_driver"]);
-    // Convert List<Map<String, dynamic>> to List<DokumenDriver>
-    newListDokumenDriver =
-        jsonDokumen.map((json) => DokumenDriver.fromJson(json)).toList();
-    newListKendaraanDriver =
-        jsonKendaraan.map((json) => KendaraanDriver.fromJson(json)).toList();
+    print(foto_akun);
   }
 
-  late File _image;
-  final picker = ImagePicker();
-  Future getImage() async {
-    final XFile? pickedFile =
-        await picker.pickImage(source: ImageSource.gallery);
-    setState(() {
-      if (pickedFile != null) {
-        _image = File(pickedFile.path);
-        uploadImageController.text = pickedFile.name;
-        print(pickedFile.name);
-      } else {
-        print('No image selected.');
-      }
-    });
-  }
-
-  Widget buildDokumenDriverForm() {
-    return Container(
-      child: Column(
-        children: [
-          Container(
-              alignment: Alignment.topLeft,
-              child: Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: Icon(Icons.card_travel),
-                  ),
-                  DropdownButton<SelectOption>(
-                    value: categoryDocument ?? categoryDocuments[0],
-                    onChanged: (SelectOption? newValue) {
-                      setState(() {
-                        jenis_dokumenController.text = newValue!.value;
-                        print(jenis_dokumenController.text);
-                        // Reset forms when changing utilityDriver
-                        //dokumenDriverForm = DokumenDriverForm();
-                        //kendaraanDriverForm = KendaraanDriverForm();
-                      });
-                    },
-                    items: categoryDocuments.map((SelectOption option) {
-                      return DropdownMenuItem<SelectOption>(
-                        value: option,
-                        child: Text(option.label),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              )),
-          Container(
+  showText(BuildContext context) {
+    return showModalBottomSheet(
+        context: context,
+        builder: (context) {
+          return Container(
+            width: double.infinity,
+            color: Colors.grey,
+            height: 100,
             child: TextField(
-              controller: nidController,
-              decoration: InputDecoration(
-                icon: Icon(Icons.wallet_membership),
-                labelText: "No ID",
-              ),
-            ),
-          ),
-          Container(
-            child: TextField(
-              controller: uploadImageController,
-              decoration: InputDecoration(
-                icon: Icon(Icons.image),
-                labelText: "Upload Gambar",
-              ),
-              onTap: () => getImage(),
-            ),
-          ),
-          Container(
-            child: TextField(
-              decoration: InputDecoration(labelText: "Tanggal berlaku"),
-              controller: datevalidController,
-              readOnly: true,
-              onTap: () async {
-                DateTime? dateTime = await showDatePicker(
-                    onDatePickerModeChange: (value) {
-                      setState(() {
-                        datevalidController.text = value.toString();
-                      });
-                    },
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(1950),
-                    lastDate: DateTime(2100));
-                print(dateTime);
-                if (dateTime != null) {
-                  //print(dateTime);
-                  String formattedDate =
-                      DateFormat('yyyy-MM-dd').format(dateTime);
-                  print(formattedDate);
-                  setState(() {
-                    datevalidController.text = formattedDate;
-                  });
-                }
+              autofocus: true,
+              onSubmitted: (value) {
+                phoneController.text = value;
+                Navigator.pop(context);
               },
             ),
-          ),
-          Text(responseImage),
-          Container(
-            child: MaterialButton(
-                color: Colors.blue,
-                child: Text("Simpan"),
-                onPressed: () async {
-                  print(widget.userModel.dataDriver);
-                  if (widget.userModel.dataDriver == null) {
-                    String addimageUrl =
-                        'https://asset.smartrans.id/upload_image.php';
-                    Map<String, String> headers = {
-                      'Authorization': "Basic YmFzZTY0OmVtYWls",
-                      'Content-type': 'multipart/form-data',
-                    };
-                    var request =
-                        http.MultipartRequest('POST', Uri.parse(addimageUrl));
-                    request.headers.addAll(headers);
-                    String? mimeType = lookupMimeType(_image.path);
-                    var multipartFile = http.MultipartFile(
-                      'image', // The name of the field for the file
-                      http.ByteStream.fromBytes(_image.readAsBytesSync()),
-                      _image.lengthSync(),
-                      filename: 'image_file.jpg',
-                      contentType: MediaType.parse(mimeType!),
-                    );
-                    request.files.add(multipartFile);
-
-                    var response = await request.send();
-                    var streamREesponse =
-                        await http.Response.fromStream(response);
-                    if (response.statusCode == 200) {
-                      final jsonDokumenDriver = [
-                        {
-                          "nid": nidController.text,
-                          "jenis_dokumen": jenis_dokumenController.text,
-                          "foto_dokumen":
-                              jsonDecode(streamREesponse.body)["filename"],
-                          "datevalid": datevalidController.text,
-                          "keterangan_dokumen": "On Review",
-                          "status": 0
-                        }
-                      ];
-                      print(jsonDokumenDriver);
-                      final dataDriver = {
-                        "keterangan_driver": "Menunggu Aktivasi",
-                        "status_driver": 0,
-                        "dokumen_driver": jsonDokumenDriver,
-                        "kendaraan_driver": []
-                      };
-                      final userData = {
-                        "id": widget.userModel.id,
-                        "uid": widget.userModel.uid,
-                        "email": widget.userModel.email,
-                        "token": widget.userModel.token,
-                        "data_account": widget.userModel.dataAccount,
-                        "rating": widget.userModel.rating,
-                        "data_driver": jsonEncode(dataDriver),
-                        "location": widget.userModel.location,
-                        "created": widget.userModel.created,
-                        "deposit": widget.userModel.deposit,
-                        "transaction": widget.userModel.transaction,
-                        "point": widget.userModel.point
-                      };
-                      LoginRepo().updateUser(userData);
-                    } else {
-                      print("error");
-                    }
-                  } else {}
-                }),
-          ),
-        ],
-      ),
-    );
+          );
+        });
   }
 
-  Widget buildKendaraanDriverForm() {
-    return Container(
-      child: Text("kendaraan driver"),
+  Future<UserModel> getProfile() async {
+    SharedPreferences uid = await SharedPreferences.getInstance();
+    final data = {"uid": uid.getString("uid").toString()};
+    final getUserUrl = Uri.parse("${ApiNetwork().baseUrl}${To().getUser}");
+    var response = await http.post(
+      getUserUrl,
+      headers: <String, String>{
+        'Authorization': basicAuth,
+        'Content-Type': "application/json; charset=UTF-8",
+      },
+      body: jsonEncode(data),
     );
+    return UserModel.fromJson(jsonDecode(response.body)["data"]);
   }
 
   @override
   Widget build(BuildContext context) {
+    /* BlocBuilder<PassengerBloc, PassengerState>(
+      builder: (context, state) {
+        if (state is PassengerLoadingState) {
+          return PopupLoading();
+        }
+        if (state is GetUserModel) {
+          
+        } */
+
     return Container(
-        margin: EdgeInsets.only(top: 30, left: 5, right: 5),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                  borderRadius: BorderRadius.all(Radius.circular(15)),
-                  color: primaryColor),
-              child: Card(
-                color: primaryColor,
-                child: Container(
-                  padding: EdgeInsets.only(
-                    left: 8,
-                    right: 15,
-                    top: 10,
-                    bottom: 10,
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                          child: ListTile(
-                        leading: ClipOval(
-                          child: Container(
-                            //child: Icon(Icons.person),
-                            child: Image.network(foto_akun),
+      margin: EdgeInsets.only(top: 30, left: 5, right: 5),
+      child: FutureBuilder(
+          future: getProfile(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return PopupLoading();
+            } else if (snapshot.hasError) {
+              return Center(
+                child: Text("Unable to load data"),
+              );
+            } else {
+              jsonUserModel = jsonEncode(snapshot.data!.toJson());
+              print(
+                  jsonDecode(jsonDecode(jsonUserModel)["data_account"])["phone"]
+                      ["countrycode"]);
+              phoneInit =
+                  jsonDecode(jsonDecode(jsonUserModel)["data_account"])["phone"]
+                          ["phoneno"]
+                      .toString();
+              dateBirth = jsonDecode(
+                  jsonDecode(jsonUserModel)["data_account"])["tanggal_lahir"];
+              countryCode =
+                  jsonDecode(jsonDecode(jsonUserModel)["data_account"])["phone"]
+                      ["countrycode"];
+              foto_akun = jsonDecode(
+                  jsonDecode(jsonUserModel)["data_account"])["foto_akun"];
+              accountStatus = jsonDecode(
+                      jsonDecode(jsonUserModel)["data_account"])["status_akun"]
+                  .toString();
+              accountMode = jsonDecode(
+                      jsonDecode(jsonUserModel)["data_account"])["active_mode"]
+                  .toString();
+              userName = jsonDecode(
+                  jsonDecode(jsonUserModel)["data_account"])["username"];
+              if (snapshot.data!.dataDriver != null) {
+                var decode = jsonDecode(snapshot.data!.dataDriver.toString());
+                List<dynamic> jsonDokumen =
+                    json.decode(decode["dokumen_driver"]);
+                List<dynamic> jsonKendaraan =
+                    json.decode(decode["kendaraan_driver"]);
+                // Convert List<Map<String, dynamic>> to List<DokumenDriver>
+                driverDocuments = jsonDokumen
+                    .map((json) => DokumenDriver.fromJson(json))
+                    .toList();
+                driverVehicles = jsonKendaraan
+                    .map((json) => KendaraanDriver.fromJson(json))
+                    .toList();
+              }
+              return SingleChildScrollView(
+                child: Column(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                          borderRadius: BorderRadius.all(Radius.circular(15)),
+                          color: primaryColor),
+                      child: Card(
+                        color: primaryColor,
+                        child: Container(
+                          padding: EdgeInsets.only(
+                            left: 8,
+                            right: 15,
+                            top: 10,
+                            bottom: 10,
                           ),
-                        ),
-                        title: Text(widget.userModel.email.toString()),
-                      )),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(
-              height: 10,
-            ),
-            Container(
-              height: 700,
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [Text("Data pribadi")],
-                        ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        Container(
-                          child: TextField(
-                            decoration:
-                                InputDecoration(labelText: "Tanggal Lahir"),
-                            controller: dateBirthController,
-                            readOnly: true,
-                            onTap: () async {
-                              DateTime? dateTime = await showDatePicker(
-                                  onDatePickerModeChange: (value) {
-                                    setState(() {
-                                      dateBirthController.text =
-                                          value.toString();
-                                    });
-                                  },
-                                  context: context,
-                                  initialDate: DateTime.now(),
-                                  firstDate: DateTime(1950),
-                                  lastDate: DateTime(2100));
-                              print(dateTime);
-                              if (dateTime != null) {
-                                //print(dateTime);
-                                String formattedDate =
-                                    DateFormat('yyyy-MM-dd').format(dateTime);
-                                print(formattedDate);
-                                setState(() {
-                                  dateBirthController.text = formattedDate;
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                        Container(
-                          child: IntlPhoneField(
-                            controller: phoneController,
-                            initialCountryCode: Countries.findByDialCode(
-                                    "+${countryCode.toString()}")
-                                .first
-                                .code,
-                            initialValue: phoneController.text,
-                            onChanged: (number) {
-                              print(number.completeNumber);
-                            },
-                            onCountryChanged: (value) {
-                              countryCode = value.dialCode;
-                              print(value.dialCode);
-                            },
-                          ),
-                        ),
-                        /* Container(
-                            alignment: Alignment.topLeft,
-                            child: DropdownButton<SelectOption>(
-                              value: selectedOption ?? utilityDriver[0],
-                              onChanged: (SelectOption? newValue) {
-                                setState(() {
-                                  selectedOption = newValue;
-                                  print(selectedOption!.value);
-                                  // Reset forms when changing utilityDriver
-                                  //dokumenDriverForm = DokumenDriverForm();
-                                  //kendaraanDriverForm = KendaraanDriverForm();
-                                });
-                              },
-                              items: utilityDriver.map((SelectOption option) {
-                                return DropdownMenuItem<SelectOption>(
-                                  value: option,
-                                  child: Text(option.label),
-                                );
-                              }).toList(),
-                            )), */
-                        if (selectedOption != null)
-                          selectedOption!.value == 'dokumen_driver'
-                              ? buildDokumenDriverForm()
-                              : buildKendaraanDriverForm(),
-                        Accordion(
-                            headerBorderColor: Colors.blueGrey,
-                            headerBorderColorOpened: Colors.transparent,
-                            // headerBorderWidth: 1,
-                            headerBackgroundColorOpened: Colors.lightBlueAccent,
-                            contentBackgroundColor: Colors.white,
-                            contentBorderColor: Colors.lightBlueAccent,
-                            contentBorderWidth: 3,
-                            contentHorizontalPadding: 10,
-                            scaleWhenAnimating: false,
-                            openAndCloseAnimation: false,
-                            headerPadding: const EdgeInsets.symmetric(
-                                vertical: 7, horizontal: 15),
-                            /*  sectionOpeningHapticFeedback:
-                                SectionHapticFeedback.heavy,
-                            sectionClosingHapticFeedback:
-                                SectionHapticFeedback.light, */
+                          child: Column(
                             children: [
-                              AccordionSection(
-                                isOpen: false,
-                                contentVerticalPadding: 10,
-                                leftIcon: const Icon(
-                                    Icons.document_scanner_outlined,
-                                    color: Colors.white),
-                                header: const Text('Data Dokumen'),
-                                content: Container(
-                                  height: 300,
-                                  child: ListView.builder(
-                                      itemCount: newListDokumenDriver.length,
-                                      itemBuilder: (context, index) {
-                                        return Container(
-                                          child: Card(
-                                            elevation: 5,
-                                            child: Container(
-                                              padding: EdgeInsets.all(10),
-                                              child: Column(
-                                                children: [
-                                                  Row(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment.start,
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Column(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .start,
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text("Jenis"),
-                                                          Text("NID"),
-                                                          Text("Berlaku"),
-                                                          Text("Keterangan")
-                                                        ],
-                                                      ),
-                                                      SizedBox(
-                                                        width: 20,
-                                                      ),
-                                                      Column(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .start,
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text(
-                                                              newListDokumenDriver[
-                                                                      index]
-                                                                  .jenisDokumen
-                                                                  .toString()),
-                                                          Text(
-                                                              newListDokumenDriver[
-                                                                      index]
-                                                                  .nid
-                                                                  .toString()),
-                                                          Text(
-                                                              "${newListDokumenDriver[index].datevalid}"),
-                                                          Text(newListDokumenDriver[
-                                                                  index]
-                                                              .keteranganDokumen
-                                                              .toString())
-                                                        ],
-                                                      ),
-                                                      SizedBox(width: 10),
-                                                      Container(
-                                                        padding:
-                                                            EdgeInsets.only(
-                                                                bottom: 18),
-                                                        child: Image.network(
-                                                            "https://asset.smartrans.id/uploads/${newListDokumenDriver[index].fotoDokumen.toString()}"),
-                                                        height: 80,
-                                                        width: 100,
-                                                      )
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      }),
+                              Container(
+                                  child: ListTile(
+                                leading: ClipOval(
+                                  child: Container(
+                                    //child: Icon(Icons.person),
+                                    child: foto_akun == ""
+                                        ? Icon(
+                                            Icons.account_circle,
+                                            size: 40,
+                                          )
+                                        : Image.network(
+                                            "https://asset.smartrans.id/uploads/${foto_akun}"),
+                                  ),
                                 ),
-                              )
-                            ]),
-                        Accordion(
-                            headerBorderColor: Colors.blueGrey,
-                            headerBorderColorOpened: Colors.transparent,
-                            // headerBorderWidth: 1,
-                            headerBackgroundColorOpened: Colors.cyanAccent,
-                            contentBackgroundColor: Colors.white,
-                            contentBorderColor: Colors.cyanAccent,
-                            contentBorderWidth: 3,
-                            contentHorizontalPadding: 20,
-                            scaleWhenAnimating: true,
-                            openAndCloseAnimation: true,
-                            headerPadding: const EdgeInsets.symmetric(
-                                vertical: 7, horizontal: 15),
-                            sectionOpeningHapticFeedback:
-                                SectionHapticFeedback.medium,
-                            sectionClosingHapticFeedback:
-                                SectionHapticFeedback.light,
+                                title: Text(snapshot.data!.email.toString()),
+                                trailing: Material(
+                                  shape: StadiumBorder(),
+                                  elevation: 5,
+                                  color: Colors.white,
+                                  child: IconButton(
+                                      color: Colors.blue,
+                                      onPressed: () {
+                                        Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                                builder: (context) =>
+                                                    ProfileEdit(
+                                                        userModel:
+                                                            snapshot.data!)));
+                                      },
+                                      icon: Icon(Icons.edit)),
+                                ),
+                              )),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 10,
+                    ),
+                    Container(
+                      child: Card(
+                        elevation: 5,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              AccordionSection(
-                                isOpen: false,
-                                contentVerticalPadding: 10,
-                                leftIcon: const Icon(
-                                    Icons.directions_car_filled,
-                                    color: Colors.white),
-                                header: const Text('Data Kendaraan'),
-                                content: Container(
-                                  height: 300,
-                                  child: ListView.builder(
-                                      itemCount: newListKendaraanDriver.length,
-                                      itemBuilder: (context, index) {
-                                        return Container(
-                                          child: Card(
-                                            elevation: 5,
-                                            child: Container(
-                                              padding: EdgeInsets.all(10),
-                                              child: Column(
-                                                children: [
-                                                  Row(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment.start,
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Column(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .start,
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text("Jenis"),
-                                                          Text("Merk"),
-                                                          Text("Plat NoPol"),
-                                                          Text("Keterangan"),
-                                                        ],
-                                                      ),
-                                                      SizedBox(
-                                                        width: 20,
-                                                      ),
-                                                      Column(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .start,
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text(
-                                                              newListKendaraanDriver[
-                                                                      index]
-                                                                  .jenis
-                                                                  .toString()),
-                                                          Text(
-                                                              newListKendaraanDriver[
-                                                                      index]
-                                                                  .merk
-                                                                  .toString()),
-                                                          Text(
-                                                              newListKendaraanDriver[
-                                                                      index]
-                                                                  .platNo
-                                                                  .toString()),
-                                                          Text(newListKendaraanDriver[
-                                                                  index]
-                                                              .keteranganKendaraan
-                                                              .toString())
-                                                        ],
-                                                      ),
-                                                      SizedBox(width: 10),
-                                                      Container(
-                                                        padding:
-                                                            EdgeInsets.only(
-                                                                bottom: 18),
-                                                        child: Image.network(
-                                                            "https://asset.smartrans.id/uploads/${newListKendaraanDriver[index].fotoKendaraan.toString()}"),
-                                                        height: 80,
-                                                        width: 100,
-                                                      )
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      }),
+                              Row(
+                                children: [
+                                  Text(
+                                    "Data pribadi",
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16),
+                                  )
+                                ],
+                              ),
+                              SizedBox(
+                                height: 10,
+                              ),
+                              Container(
+                                child: Row(
+                                  children: [
+                                    Container(
+                                        padding: EdgeInsets.only(left: 15),
+                                        child: Icon(Icons.person_2)),
+                                    Container(
+                                        padding: EdgeInsets.only(left: 25),
+                                        child: Text(userName == ""
+                                            ? "Nama belum di isi"
+                                            : userName)),
+                                  ],
                                 ),
                               ),
-                            ]),
+                              SizedBox(
+                                height: 10,
+                              ),
+                              Container(
+                                child: Row(
+                                  children: [
+                                    Container(
+                                        padding: EdgeInsets.only(left: 15),
+                                        child: Icon(Icons.calendar_month)),
+                                    Container(
+                                        padding: EdgeInsets.only(left: 25),
+                                        child: Text(dateBirth == ""
+                                            ? "Tanggal lahir belum di isi"
+                                            : dateBirth)),
+                                  ],
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 104,
+                                    child: CountryCodePicker(
+                                      enabled: false,
+                                      alignLeft: true,
+                                      padding: const EdgeInsets.all(0),
+                                      onChanged: (value) {
+                                        countryCode = value.dialCode.toString();
+                                      },
+                                      // Initial selection and favorite can be one of code ('IT') OR dial_code('+39')
+                                      initialSelection: countryCode == ""
+                                          ? "ID"
+                                          : Countries.findByDialCode(jsonDecode(
+                                                      jsonDecode(jsonUserModel)[
+                                                          "data_account"])[
+                                                  "phone"]["countrycode"])
+                                              .first
+                                              .code,
+                                      //favorite: const ['+62', 'ID'],
+                                      // flag can be styled with BoxDecoration's `borderRadius` and `shape` fields
+                                      flagDecoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(7),
+                                      ),
+                                    ),
+                                  ),
+                                  Text(phoneInit! == ""
+                                      ? "No Handphone belum di isi"
+                                      : phoneInit!),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 10,
+                    ),
+                    Container(
+                      child: Card(
+                        elevation: 5,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    "Data akun",
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16),
+                                  )
+                                ],
+                              ),
+                              SizedBox(
+                                height: 10,
+                              ),
+                              Container(
+                                child: Row(
+                                  children: [
+                                    Container(
+                                        padding: EdgeInsets.only(left: 15),
+                                        child: Icon(Icons.card_membership)),
+                                    Container(
+                                        padding: EdgeInsets.only(left: 25),
+                                        child: Text(accountMode == "pelanggan"
+                                            ? "Pelanggan"
+                                            : "Driver")),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(
+                                height: 10,
+                              ),
+                              Row(
+                                children: [
+                                  Container(
+                                      padding: EdgeInsets.only(left: 15),
+                                      child: Icon(
+                                        Icons.circle,
+                                        size: 28,
+                                        color: accountStatus == "1"
+                                            ? Colors.lightGreen
+                                            : Colors.grey,
+                                      )),
+                                  Container(
+                                      padding: EdgeInsets.only(left: 25),
+                                      child: Text(accountStatus == "1"
+                                          ? "Aktif"
+                                          : "Tidak aktif")),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Container(
+                      child: Card(
+                        elevation: 5,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    "Berkas Dokumen",
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16),
+                                  )
+                                ],
+                              ),
+                              SizedBox(
+                                height: 5,
+                              ),
+                              LimitedBox(
+                                maxHeight: 280,
+                                maxWidth: double.infinity,
+                                child: ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: driverDocuments.length,
+                                    itemBuilder: (context, index) {
+                                      return Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Card(
+                                          elevation: 2,
+                                          child: Container(
+                                            child: Column(
+                                              children: [
+                                                Container(
+                                                  height: 200,
+                                                  width: double.infinity,
+                                                  child: Image.network(
+                                                      fit: BoxFit.fill,
+                                                      "https://asset.smartrans.id/uploads/${driverDocuments[index].fotoDokumen.toString()}"),
+                                                ),
+                                                ListTile(
+                                                  title: Text(
+                                                      driverDocuments[index]
+                                                          .jenisDokumen
+                                                          .toString()),
+                                                  subtitle: Container(
+                                                    child: Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .start,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(driverDocuments[
+                                                                index]
+                                                            .nid
+                                                            .toString()),
+                                                        Text(
+                                                          "Expired at ${driverDocuments[index].datevalid.toString()}",
+                                                          style: TextStyle(
+                                                              color:
+                                                                  Colors.orange,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold),
+                                                        ),
+                                                        Text(
+                                                          driverDocuments[index]
+                                                              .keteranganDokumen
+                                                              .toString(),
+                                                          style: TextStyle(
+                                                              color: driverDocuments[
+                                                                              index]
+                                                                          .keteranganDokumen
+                                                                          .toString() ==
+                                                                      "On Review"
+                                                                  ? Colors.blue
+                                                                  : Colors
+                                                                      .green,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ), /* 
+                                                  leading: Container(
+                                                    width: 180,
+                                                    height: 180,
+                                                    child: Image.network(
+                                                        fit: BoxFit.fill,
+                                                        "https://asset.smartrans.id/uploads/${driverDocuments[index].fotoDokumen.toString()}"),
+                                                  ), */
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                              ),
+                              SizedBox(
+                                height: 10,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Container(
+                      child: Card(
+                        elevation: 5,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    "Berkas Kendaraan",
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16),
+                                  )
+                                ],
+                              ),
+                              SizedBox(
+                                height: 5,
+                              ),
+                              Container(
+                                height: 280,
+                                width: double.infinity,
+                                child: ListView.builder(
+                                    itemCount: driverVehicles.length,
+                                    itemBuilder: (context, index) {
+                                      return Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Card(
+                                          elevation: 2,
+                                          child: Container(
+                                            child: Column(
+                                              children: [
+                                                Container(
+                                                  height: 200,
+                                                  width: double.infinity,
+                                                  child: Image.network(
+                                                      fit: BoxFit.fill,
+                                                      "https://asset.smartrans.id/uploads/${driverVehicles[index].fotoKendaraan.toString()}"),
+                                                ),
+                                                ListTile(
+                                                    title: Text(
+                                                        driverVehicles[index]
+                                                            .merk
+                                                            .toString()),
+                                                    subtitle: Container(
+                                                      child: Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .start,
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(driverVehicles[
+                                                                  index]
+                                                              .jenis
+                                                              .toString()),
+                                                          Text(driverVehicles[
+                                                                  index]
+                                                              .platNo
+                                                              .toString()),
+                                                          Text(
+                                                            driverVehicles[
+                                                                    index]
+                                                                .keteranganKendaraan
+                                                                .toString(),
+                                                            style: TextStyle(
+                                                                color: driverVehicles[index]
+                                                                            .keteranganKendaraan
+                                                                            .toString() ==
+                                                                        "On Review"
+                                                                    ? Colors
+                                                                        .blue
+                                                                    : Colors
+                                                                        .green,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    )),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                              ),
+                              SizedBox(
+                                height: 10,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
                         MaterialButton(
-                            shape: const StadiumBorder(),
-                            color: Colors.blueAccent,
-                            minWidth: double.infinity,
-                            child: Text("Simpan perubahan"),
-                            onPressed: () async {
-                              print(phoneController.text);
-
-                              // Convert List<Map<String, dynamic>> to List<NotifListJob>
-                              /* List<DokumenDriver> decodedJobList =
-                                  decode.map((map) => DokumenDriver(
-                                        nid: map['nid'],
-                                        jenisDokumen: map['jenis_dokumen'],
-                                        fotoDokumen: map['foto_dokumen'],
-                                        datevalid: map['datevalid'],
-                                        keteranganDokumen:
-                                            map['keterangan_dokumen'],
-                                        status: map['status'],
-                                      )); */
-                              /* final dataAccount = {
-                      "mode": ["pelanggan"],
-                      "phone": {
-                        "phoneno": phoneController.text,
-                        "countrycode": countryCode,
-                        "verified_wa": "0",
-                        "verified_sms": "0"
-                      },
-                      "username": widget.userModel.email,
-                      "foto_akun":
-                          "https://lh3.googleusercontent.com/a/ACg8ocKKzKel6U90qGca3UABAvNRkXJ_SibbN_hN_3omhloz2w",
-                      "active_mode": "pelanggan",
-                      "status_akun": 1,
-                      "tanggal_lahir": dateBirthController.text
-                    }; */
+                            minWidth: 120,
+                            shape: StadiumBorder(),
+                            color: primaryColor,
+                            child: Text("Go to Passenger"),
+                            onPressed: () {
                               showDialog(
+                                  barrierDismissible: false,
                                   context: (context),
                                   builder: (context) {
                                     return LogoandSpinner(
@@ -667,41 +604,99 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       spinSpeed: Duration(milliseconds: 500),
                                     );
                                   });
-                              /*  final dataAccount =
-                                  "{\"mode\": [\"pelanggan\"], \"phone\": {\"phoneno\": \"${phoneController.text}\", \"countrycode\": \"${countryCode}\", \"verified_wa\": \"0\", \"verified_sms\": \"0\"}, \"username\": \"${widget.userModel.email}\", \"foto_akun\": \"${foto_akun}\", \"active_mode\": \"pelanggan\", \"status_akun\": 1, \"tanggal_lahir\": \"${dateBirthController.text}\"}";
-                              final userData = {
-                                "id": widget.userModel.id,
-                                "uid": widget.userModel.uid,
-                                "email": widget.userModel.email,
-                                "token": widget.userModel.token,
-                                "data_account": dataAccount,
-                                "rating": widget.userModel.rating,
-                                "data_driver": widget.userModel.dataDriver,
-                                "location": widget.userModel.location,
-                                "created": widget.userModel.created,
-                                "deposit": widget.userModel.deposit,
-                                "transaction": widget.userModel.transaction,
-                                "point": widget.userModel.point
-                              };
-                              LoginRepo().updateUser(userData);
-                              Future.delayed(Duration(seconds: 4), () {
-                                Navigator.of(context, rootNavigator: true)
-                                    .pop();
 
-                                QuickAlert.show(
-                                    context: context,
-                                    type: QuickAlertType.success,
-                                    text: 'Data berhasil di edit',
-                                    autoCloseDuration: Duration(seconds: 2));
-                              }); */
-                            })
+                              final dataAccount =
+                                  "{\"mode\": [\"passenger\"], \"phone\": {\"phoneno\": \"${phoneInit}\", \"countrycode\": \"${countryCode}\", \"verified_wa\": \"0\", \"verified_sms\": \"0\"}, \"username\": \"${userName}\", \"foto_akun\": \"${foto_akun}\", \"active_mode\": \"passenger\", \"status_akun\": 1, \"tanggal_lahir\": \"${dateBirth}\"}";
+                              final userData = {
+                                "id": snapshot.data!.id,
+                                "uid": snapshot.data!.uid,
+                                "email": snapshot.data!.email,
+                                "token": snapshot.data!.token,
+                                "data_account": dataAccount,
+                                "rating": snapshot.data!.rating,
+                                "data_driver": snapshot.data!.dataDriver,
+                                "location": snapshot.data!.location,
+                                "created": snapshot.data!.created,
+                                "deposit": snapshot.data!.deposit,
+                                "transaction": snapshot.data!.transaction,
+                                "point": snapshot.data!.point
+                              };
+                              LoginRepo().updateUser(userData).then((value) {
+                                if (value["status"] == "ok") {
+                                  Navigator.of(context, rootNavigator: true)
+                                      .pop();
+
+                                  QuickAlert.show(
+                                      context: context,
+                                      type: QuickAlertType.success,
+                                      text: 'Beralih ke mode passenger',
+                                      autoCloseDuration: Duration(seconds: 2));
+                                  Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) => PassengerHome(
+                                              //user: widget.user,
+                                              userModel: snapshot.data!,
+                                              isDriver: true)));
+                                  /* Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) => BerkasDriver(
+                                                //user: widget.user,
+                                                userModel: snapshot.data!,
+                                              ))); */
+                                } else {
+                                  Navigator.of(context, rootNavigator: true)
+                                      .pop();
+
+                                  QuickAlert.show(
+                                      context: context,
+                                      type: QuickAlertType.error,
+                                      text: 'Gagal pindah mode',
+                                      autoCloseDuration: Duration(seconds: 2));
+                                }
+                              });
+                            }),
+                        MaterialButton(
+                          minWidth: 120,
+                          shape: StadiumBorder(),
+                          color: Colors.grey,
+                          child: Text("Logout"),
+                          onPressed: () async {
+                            final AuthRepository authRepository =
+                                AuthRepository();
+                            final GlobalKey<NavigatorState> navigatorKey =
+                                GlobalKey();
+                            SharedPreferences userCache =
+                                await SharedPreferences.getInstance();
+                            await userCache.clear();
+                            await authRepository.signOutFromGoogle();
+                            Future.delayed(Duration(seconds: 2), () {
+                              Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: ((context) => MyApp(
+                                          authRepository: authRepository,
+                                          navigatorKey: navigatorKey))));
+                            });
+                          },
+                        )
                       ],
-                    ),
-                  ),
+                    )
+                  ],
                 ),
-              ),
-            ),
-          ],
-        ));
+              );
+            }
+          }),
+    );
+    //},
+    //);
+  }
+
+  @override
+  void dispose() {
+    //PassengerBloc().close();
+    phoneController.dispose();
+    super.dispose();
   }
 }

@@ -1,7 +1,7 @@
 class Location {
-  final String address;
   final String lat;
   final String lng;
+  final String address;
   //final int minPrice;
 
   Location({
@@ -13,17 +13,17 @@ class Location {
 
   Map<String, dynamic> toJson() {
     return {
-      'address': address,
       'lat': lat,
       'lng': lng,
+      'address': address,
     };
   }
 
   factory Location.fromJson(Map<String, dynamic> json) {
     return Location(
-      address: json['address'] ?? '',
       lat: json['lat'] ?? '',
       lng: json['lng'] ?? '',
+      address: json['address'] ?? '',
     );
   }
 }

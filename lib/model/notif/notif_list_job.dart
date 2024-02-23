@@ -1,9 +1,14 @@
+import 'package:signgoogle/model/location.dart';
+
 class NotifListJob {
+  final String uid_transaction;
   final String uid_user;
   final String nama_user;
   final String distance;
   final String total_alamat;
   final String tarif;
+  //final List<Location> location;
+  final String location;
   //final String bid;
   final String jarak_driver;
   final String waktu_jemput;
@@ -17,11 +22,13 @@ class NotifListJob {
   final String token_user;
 
   NotifListJob(
-      {required this.uid_user,
+      {required this.uid_transaction,
+      required this.uid_user,
       required this.nama_user,
       required this.distance,
       required this.total_alamat,
       required this.tarif,
+      required this.location,
       //required this.bid,
       required this.jarak_driver,
       required this.waktu_jemput,
@@ -37,11 +44,13 @@ class NotifListJob {
 
   // Convert Car object to Map
   Map<String, dynamic> toJson() => {
+        'uid_transaction': uid_transaction,
         'uid_user': uid_user,
         'nama_user': nama_user,
         'jarak_tujuan': distance,
         'total_alamat': total_alamat,
         'tarif': tarif,
+        'location': location,
         //'bid': bid,
         'jarak_driver': jarak_driver,
         'waktu_jemput': waktu_jemput,
@@ -57,11 +66,13 @@ class NotifListJob {
 
   // Create Car object from Map
   factory NotifListJob.fromJson(Map<String, dynamic> json) => NotifListJob(
+        uid_transaction: json['uid_transaction'].toString(),
         uid_user: json['uid_user'].toString(),
         nama_user: json['nama_user'].toString(),
         distance: json['jarak_tujuan'].toString(),
         total_alamat: json['total_alamat'].toString(),
         tarif: json['tarif'].toString(),
+        location: json['location'],
         //bid: json['bid'].toString(),
         jarak_driver: json['jarak_driver'].toString(),
         waktu_jemput: json['waktu_jemput'].toString(),

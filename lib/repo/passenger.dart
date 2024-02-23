@@ -5,6 +5,9 @@ import 'package:day_night_time_picker/day_night_time_picker.dart';
 import 'package:easy_date_timeline/easy_date_timeline.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:signgoogle/model/driverlatlng.dart';
+import 'package:signgoogle/model/location.dart';
+import 'package:signgoogle/model/user.dart';
 import 'package:signgoogle/utils/api.dart';
 import 'package:signgoogle/utils/basic_auth.dart';
 import 'package:http/http.dart' as http;
@@ -39,12 +42,14 @@ class PassengerRepo {
     print(response.body);
   }
 
-  dynamic assign(String uidTransaction, String tarif, String uidDriver) async {
+  Future<dynamic> assign(
+      String uidTransaction, String tarif, String uidDriver) async {
     final data = {
       "uid": uidTransaction,
       "price_deal": tarif,
       "uid_driver": uidDriver
     };
+    String resultRes = "";
     var changeStausUrl =
         Uri.parse("${ApiNetwork().baseUrl}${To().assignTransaction}");
     var response = await http.post(
@@ -59,6 +64,98 @@ class PassengerRepo {
     );
     return jsonDecode(response.body);
   }
+
+  Future<dynamic> assignDriver(
+      String uidTransaction, String tarif, String uidDriver) async {
+    final messageData = {
+      "to": uidDriver,
+      "notification": {
+        "title": "passenger assign",
+        "body": {
+          "type": "passenger_assign",
+          "mode": "driver",
+          "data": {
+            "uid": uidTransaction,
+          }
+        }
+      }
+    };
+    var response = await http.post(
+      Uri.parse(ApiNetwork().sendFCM),
+      headers: <String, String>{
+        'Authorization':
+            'key=AAAA6aaLav4:APA91bFvl-M6_aJ203ILj-nvJzvbP2w9w46aISycMVjnjEI1WYZrcXRJ-hLrj7C7HlL0pmYRShiPnuAZnHlkiMR7e2rOH0I1av9Nwk1g2BUv8O0HV4b4A4xrxN-sCF8ii4ifr5NZbFf-',
+        'Content-Type': "application/json; charset=UTF-8",
+      },
+      // use for this user
+      body: json.encode(messageData),
+      encoding: Encoding.getByName('utf-8'),
+    );
+    return jsonDecode(response.body);
+  }
+
+  Future<dynamic> changeStatusTransaction(
+      String uidTransaction, String status) async {
+    final data = {"uid": uidTransaction, "statusnew": status};
+    String resultRes = "";
+    var changeStausUrl =
+        Uri.parse("${ApiNetwork().baseUrl}${To().updateStatusTransaction}");
+    var response = await http.post(
+      changeStausUrl,
+      headers: <String, String>{
+        'Authorization': basicAuth,
+        'Content-Type': "application/json; charset=UTF-8",
+      },
+      // use for this user
+      //body: jsonEncode(<String, String>{'email': user!.email.toString()}),
+      body: jsonEncode(data),
+    );
+    return jsonDecode(response.body);
+  }
+
+  /* Future<dynamic> assignDriver(
+      UserModel userModel,
+      List<Location> locationPassenger,
+      String? orderDetail,
+      DriverLatLng driverLatLng,
+      String driverDetail) async {
+    var kendaraanDriver =
+        jsonDecode(userModel.dataDriver.toString())["kendaraan_driver"][0];
+
+    final messageData = {
+      "to": jsonDecode(driverDetail)["token_driver"],
+      "notification": {
+        "title": "bidding",
+        "body": {
+          "type": "proove_bid",
+          "mode": "passenger",
+          "data": {
+            "id_passenger": userModel.uid,
+            "nama_passenger":
+                jsonDecode(userModel.dataAccount.toString())["username"],
+            "id_driver": jsonDecode(driverDetail)["uid_driver"],
+            "nama_driver": jsonDecode(driverDetail)["nama_driver"],
+            "order_detail": orderDetail,
+            "token_driver": jsonDecode(driverDetail)["token_driver"],
+            "token_user": userModel.token,
+          }
+        }
+      }
+    };
+
+    var response = await http.post(
+      Uri.parse(ApiNetwork().sendFCM),
+      headers: <String, String>{
+        'Authorization':
+            'key=AAAA6aaLav4:APA91bFvl-M6_aJ203ILj-nvJzvbP2w9w46aISycMVjnjEI1WYZrcXRJ-hLrj7C7HlL0pmYRShiPnuAZnHlkiMR7e2rOH0I1av9Nwk1g2BUv8O0HV4b4A4xrxN-sCF8ii4ifr5NZbFf-',
+        'Content-Type': "application/json; charset=UTF-8",
+      },
+      // use for this user
+      body: json.encode(messageData),
+      encoding: Encoding.getByName('utf-8'),
+    );
+    print(response.body);
+  } */
 
   /* Future<dynamic> assignToDriver(
       UserModel userModel, NotifListJob passenger, String? tarif) async {

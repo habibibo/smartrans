@@ -15,8 +15,11 @@ import 'package:flutter_sliding_box/flutter_sliding_box.dart';
 //import 'package:geocoding/geocoding.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:linear_timer/linear_timer.dart';
+import 'package:quickalert/models/quickalert_type.dart';
+import 'package:quickalert/widgets/quickalert_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signgoogle/model/customer_transaction.dart';
+import 'package:signgoogle/model/driverlatlng.dart';
 import 'package:signgoogle/model/fitur.dart';
 import 'package:signgoogle/model/location.dart';
 import 'package:signgoogle/model/near_driver.dart';
@@ -24,6 +27,7 @@ import 'package:signgoogle/model/notif/driver_bid.dart';
 import 'package:signgoogle/model/payment_method.dart';
 import 'package:signgoogle/model/pricing_detail.dart';
 import 'package:signgoogle/model/transaction.dart';
+import 'package:signgoogle/model/user.dart';
 import 'package:signgoogle/repo/passenger.dart';
 import 'package:signgoogle/screen/passenger/live_tracking.dart';
 import 'package:signgoogle/screen/passenger/ride.dart';
@@ -123,35 +127,44 @@ Future<void> main() async {
   final String distance = "";
   final String duration = "";
   final String bearing = "";
-  GoogleSignInAccount? user;
+  final String area = "";
+  UserModel userModel = UserModel();
+  //GoogleSignInAccount? user;
   runApp(ChooseDriver(
-      duration: duration,
-      bearing: bearing,
-      user: user,
-      directionLatLng: directionLatLng,
-      features: features,
-      locations: locations,
-      distance: distance));
+    userModel: userModel,
+    duration: duration,
+    bearing: bearing,
+    //user: user,
+    directionLatLng: directionLatLng,
+    features: features,
+    locations: locations,
+    distance: distance,
+    area: area,
+  ));
   // runApp(const MyApp());
 }
 
 class ChooseDriver extends StatefulWidget {
-  ChooseDriver(
-      {Key? key,
-      required this.user,
-      required this.directionLatLng,
-      required this.locations,
-      required this.features,
-      required this.distance,
-      required this.bearing,
-      required this.duration})
-      : super(key: key);
+  ChooseDriver({
+    Key? key,
+    //required this.user,
+    required this.userModel,
+    required this.directionLatLng,
+    required this.locations,
+    required this.features,
+    required this.distance,
+    required this.bearing,
+    required this.duration,
+    required this.area,
+  }) : super(key: key);
   final List<flutterMapDirection.LatLng> directionLatLng;
   final List<Feature> features;
   final String distance;
-  GoogleSignInAccount? user;
+  UserModel userModel;
+  //GoogleSignInAccount? user;
   final String bearing;
   final String duration;
+  final String area;
   final List<String> locations;
 
   @override
@@ -378,14 +391,17 @@ class _ChooseDriverState extends State<ChooseDriver> {
                               defaultPrice = double.parse(widget
                                       .features[selectedIndex].price.price
                                       .toString())
+                                  .toStringAsFixed(2)
                                   .toString();
                               minPrice = double.parse(widget
                                       .features[selectedIndex].price.minPrice
                                       .toString())
+                                  .toStringAsFixed(2)
                                   .toString();
                               maxOffer = double.parse(widget
                                       .features[selectedIndex].price.maxTawar
                                       .toString())
+                                  .toStringAsFixed(2)
                                   .toString();
                               print(defaultPrice);
                             } else {
@@ -426,7 +442,7 @@ class _ChooseDriverState extends State<ChooseDriver> {
                                                 ? Column(
                                                     children: [
                                                       Text(
-                                                        "Rp ${widget.features[index].price.price.toString()}",
+                                                        "Rp ${double.parse(widget.features[index].price.price.toString()).toStringAsFixed(2)}",
                                                         //"Rp price card",
                                                         style: TextStyle(
                                                             color: Colors.black,
@@ -449,7 +465,7 @@ class _ChooseDriverState extends State<ChooseDriver> {
                                                     ],
                                                   )
                                                 : Text(
-                                                    "Rp ${widget.features[index].price.price.toString()}",
+                                                    "Rp ${double.parse(widget.features[index].price.price.toString()).toStringAsFixed(2)}",
                                                     //"Rp price card",
                                                     style: TextStyle(
                                                       color: Colors.black,
@@ -1198,15 +1214,15 @@ class _ChooseDriverState extends State<ChooseDriver> {
                               //defaultPrice = "";
                               defaultPrice = (double.parse(widget
                                       .features[selectedIndex].price.price))
-                                  .toString();
+                                  .toStringAsFixed(2);
                               minPrice = double.parse(widget
                                       .features[selectedIndex].price.minPrice
                                       .toString())
-                                  .toString();
+                                  .toStringAsFixed(2);
                               maxOffer = double.parse(widget
                                       .features[selectedIndex].price.maxTawar
                                       .toString())
-                                  .toString();
+                                  .toStringAsFixed(2);
                               print(defaultPrice);
                             } else {
                               selectedIndex =
@@ -1246,7 +1262,7 @@ class _ChooseDriverState extends State<ChooseDriver> {
                                                 ? Column(
                                                     children: [
                                                       Text(
-                                                        "Rp ${widget.features[index].price.price}",
+                                                        "Rp ${double.parse(widget.features[index].price.price).toStringAsFixed(2)}",
                                                         // "Rp price card",
                                                         style: TextStyle(
                                                             color: Colors.black,
@@ -1269,7 +1285,7 @@ class _ChooseDriverState extends State<ChooseDriver> {
                                                     ],
                                                   )
                                                 : Text(
-                                                    "Rp ${widget.features[index].price.price.toString()}",
+                                                    "Rp ${double.parse(widget.features[index].price.price.toString()).toStringAsFixed(2)}",
                                                     //"Rp price card",
                                                     style: TextStyle(
                                                       color: Colors.black,
@@ -1631,15 +1647,16 @@ class _ChooseDriverState extends State<ChooseDriver> {
                 children: [
                   IconButton(
                       onPressed: () {
+                        Navigator.pop(context);
                         //GoogleSignInAccount? user = widget.user;
                         //print("print");
                         //authBloc.add(GoingPassenger());
-                        Navigator.pushReplacement(
+                        /* Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
                                 builder: (context) => PassengerRide(
                                       user: widget.user,
-                                    )));
+                                    ))); */
                       },
                       icon: Icon(
                         Icons.arrow_circle_left,
@@ -1820,28 +1837,26 @@ class _ChooseDriverState extends State<ChooseDriver> {
                                   .toString(),
                               pax: "",
                               qty: "",
-                              area: "surabaya",
-                              paymentmethod: paymentMethod,
-                              promo: promo);
+                              paymentmethod: jsonDecode(paymentMethod)["name"],
+                              promo: promo,
+                              geofence: widget.area.toLowerCase());
 
                           final routeTransaction = {
                             "durasi": widget.duration,
                             "distance": widget.distance,
                             "trafficTime": widget.duration,
-                            "location": [
-                              jsonEncode(newLocation
-                                  .map((location) => location.toJson())
-                                  .toList())
-                            ]
+                            "location": newLocation
                           };
 
+                          /*  SharedPreferences cacheUser =
+                              await SharedPreferences.getInstance(); */
                           CustomerTransaction customerTransaction =
                               CustomerTransaction(
-                                  uidUser:
-                                      "7468696e-6b62-4962-af40-676d61696c2e",
-                                  nama: widget.user!.displayName,
-                                  phone: "6285604989623",
-                                  email: widget.user!.email);
+                                  uidUser: widget.userModel.uid,
+                                  nama: "nama",
+                                  phone: jsonDecode(widget.userModel.dataAccount
+                                      .toString())["phone"]["phoneno"],
+                                  email: widget.userModel.email);
 
                           print(customerTransaction.toJson().toString());
                           /* final dataTransaction = {
@@ -1871,18 +1886,14 @@ class _ChooseDriverState extends State<ChooseDriver> {
                               },
                               // use for this user
                               body: jsonEncode({
-                                "rute": routeTransaction,
-                                /* "rute": {
-                                  "durasi": "0",
-                                  "distance": "16100",
-                                  "trafficTime": "2340",
-                                  "location": [
-                                    jsonEncode(newLocation
-                                        .map((location) => location.toJson())
-                                        .toList())
-                                  ]
+                                //"rute": routeTransaction,
+                                "rute": {
+                                  "durasi": widget.duration,
+                                  "distance": widget.distance,
+                                  "trafficTime": widget.duration,
+                                  "location": newLocation
                                 },
-                                */
+
                                 /*  "price": jsonEncode(widget
                                         .features[selectedIndex].price
                                         .toString()), */
@@ -1932,28 +1943,36 @@ class _ChooseDriverState extends State<ChooseDriver> {
                                   "minprice": widget
                                       .features[selectedIndex].price.minPrice
                                 },
-                                "transaction": transaction,
-                                /* "transaction": {
-                                  "nowlater": 1,
-                                  "waktu_pickup": "2024-01-08 21:37:19",
+                                //"transaction": transaction,
+
+                                "transaction": {
+                                  "nowlater": "1",
+                                  "waktu_pickup":
+                                      "${scheduleDate} ${scheduleTime}",
                                   "notes": "tes notes",
                                   "addons": "",
-                                  "id_fitur": "1",
-                                  "fitur": "SmartCar",
-                                  "pax": "1",
-                                  "qty": 1,
-                                  "area": "surabaya",
-                                  "paymentmethod": "CASH",
-                                  "promo": ""
-                                }, */
-                                "customer": customerTransaction
-                                /* "customer": {
-                                  "uid_user":
-                                      "7468696e-6b62-4962-af40-676d61696c2e",
-                                  "nama": "bejo sudarso",
-                                  "phone": "62874124127",
-                                  "email": "thinkbibo@gmail.com"
-                                } */
+                                  "id_fitur": widget.features[selectedIndex].id
+                                      .toString(),
+                                  "fitur": widget.features[selectedIndex].name
+                                      .toString(),
+                                  "pax": "",
+                                  "qty": "",
+                                  "paymentmethod":
+                                      jsonDecode(paymentMethod)["name"],
+                                  "promo": promo,
+                                  "geofence": widget.area.toLowerCase()
+                                },
+                                //"customer": customerTransaction
+                                "customer": {
+                                  "uid_user": widget.userModel.uid,
+                                  "nama": jsonDecode(widget
+                                      .userModel.dataAccount
+                                      .toString())["username"],
+                                  "phone": jsonDecode(widget
+                                      .userModel.dataAccount
+                                      .toString())["phone"]["phoneno"],
+                                  "email": widget.userModel.email
+                                }
                               }));
                           print("create transaksi");
                           //print(response.body);
@@ -2245,22 +2264,27 @@ class _DialogContent2State extends State<DialogContent2> {
       print('Message data: ${dataBody["data"]}');
       //print(dataBody["data"][0]["jarakMinimum"]);
       setState(() {
+        Map<String, dynamic> jsonMapLatLng =
+            json.decode(dataBody["data"]["driverLatLng"]);
+        DriverLatLng driverLatLng = DriverLatLng.fromJson(jsonMapLatLng);
         driverList2.add(DriverBid(
-            idPassenger: dataBody["data"][0]["id_passenger"].toString(),
-            namaPassenger: dataBody["data"][0]["nama_passenger"].toString(),
-            idDriver: dataBody["data"][0]["id_driver"].toString(),
-            namaDriver: dataBody["data"][0]["nama_driver"].toString(),
-            jarakTujuan: dataBody["data"][0]["jarak_tujuan"].toString(),
-            totalAlamat: dataBody["data"][0]["total_alamat"].toString(),
-            fotoDriver: dataBody["data"][0]["foto_driver"].toString(),
-            ratingDriver: dataBody["data"][0]["rating_driver"].toString(),
-            kendaraan: dataBody["data"][0]["kendaraan"].toString(),
-            driverLatLng: dataBody["data"][0]["driverLatLng"],
-            tarif: dataBody["data"][0]["tarif"].toString(),
-            bid: dataBody["data"][0]["bid"].toString(),
-            jarakDriver: dataBody["data"][0]["jarak_driver"].toString(),
-            waktuJemput: dataBody["data"][0]["waktu_jemput"].toString(),
-            pembayaran: dataBody["data"][0]["pembayaran"].toString()));
+            tokenUser: dataBody["data"]["token_user"].toString(),
+            tokenDriver: dataBody["data"]["token_driver"].toString(),
+            idPassenger: dataBody["data"]["id_passenger"].toString(),
+            namaPassenger: dataBody["data"]["nama_passenger"].toString(),
+            idDriver: dataBody["data"]["id_driver"].toString(),
+            namaDriver: dataBody["data"]["nama_driver"].toString(),
+            jarakTujuan: dataBody["data"]["jarak_tujuan"].toString(),
+            totalAlamat: dataBody["data"]["total_alamat"].toString(),
+            fotoDriver: dataBody["data"]["foto_driver"].toString(),
+            ratingDriver: dataBody["data"]["rating_driver"].toString(),
+            kendaraan: dataBody["data"]["kendaraan"].toString(),
+            driverLatLng: driverLatLng,
+            tarif: dataBody["data"]["tarif"].toString(),
+            bid: dataBody["data"]["bid"].toString(),
+            jarakDriver: dataBody["data"]["jarak_driver"].toString(),
+            waktuJemput: dataBody["data"]["waktu_jemput"].toString(),
+            pembayaran: dataBody["data"]["pembayaran"].toString()));
         /* driverList.add(NearDriver(
             jarakMinimum: dataBody["data"][0]["jarakMinimum"],
             walletMinimum: dataBody["data"][0]["walletMinimum"],
@@ -2406,31 +2430,113 @@ class _DialogContent2State extends State<DialogContent2> {
                                                               user: widget.user,
                                                               driverModel: widget.driverModel))); */
 
-                                        PassengerRepo().assign(
-                                            widget.uidTransaction,
-                                            widget.pricingDetails.price,
-                                            driverList2[index]
-                                                .idDriver
+                                        PassengerRepo()
+                                            .assign(
+                                                widget.uidTransaction,
+                                                widget.pricingDetails.price,
+                                                driverList2[index]
+                                                    .idDriver
+                                                    .toString())
+                                            .then((value) {
+                                          print(value["status"]);
+                                          if (value["status"].toString() ==
+                                              "ok".toString()) {
+                                            print(driverList2[index]
+                                                .tokenDriver
                                                 .toString());
-                                        Future.delayed(Duration(seconds: 2),
-                                            () {
-                                          Navigator.pushReplacement(
-                                              context,
-                                              MaterialPageRoute(
-                                                  builder: (context) => LiveTracking(
-                                                      transaction:
-                                                          widget.transaction,
-                                                      pricingDetails:
-                                                          widget.pricingDetails,
-                                                      duration: widget.duration,
-                                                      distance: widget.distance,
-                                                      customerTransaction: widget
-                                                          .customerTransaction,
-                                                      driverBid:
-                                                          driverList2[index],
-                                                      newLocation:
-                                                          widget.newLocation)));
+                                            PassengerRepo()
+                                                .assignDriver(
+                                                    widget.uidTransaction,
+                                                    widget.pricingDetails.price,
+                                                    driverList2[index]
+                                                        .tokenDriver
+                                                        .toString())
+                                                .then((value) {
+                                              print(value);
+                                              if (value["success"] == 1) {
+                                                PassengerRepo()
+                                                    .changeStatusTransaction(
+                                                        widget.uidTransaction,
+                                                        "1")
+                                                    .then((value) {
+                                                  if (value["status"] ==
+                                                      "ok".toString()) {
+                                                    Navigator.pushReplacement(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                            builder: (context) => LiveTracking(
+                                                                transaction: widget
+                                                                    .transaction,
+                                                                pricingDetails:
+                                                                    widget
+                                                                        .pricingDetails,
+                                                                duration: widget
+                                                                    .duration,
+                                                                distance: widget
+                                                                    .distance,
+                                                                customerTransaction:
+                                                                    widget
+                                                                        .customerTransaction,
+                                                                driverBid:
+                                                                    driverList2[
+                                                                        index],
+                                                                newLocation: widget
+                                                                    .newLocation)));
+                                                  } else {
+                                                    QuickAlert.show(
+                                                        context: context,
+                                                        type: QuickAlertType
+                                                            .error,
+                                                        title:
+                                                            "Gagal mengubah status transaksi");
+                                                  }
+                                                });
+                                              } else {
+                                                QuickAlert.show(
+                                                    context: context,
+                                                    type: QuickAlertType.error,
+                                                    title:
+                                                        "Gagal mendapatkan driver");
+                                              }
+                                            });
+                                          } else {
+                                            QuickAlert.show(
+                                                context: context,
+                                                type: QuickAlertType.error,
+                                                title:
+                                                    "Gagal assign ke driver");
+                                          }
+                                          /* if (value["success"]) {
+                                            Navigator.pushReplacement(
+                                                context,
+                                                MaterialPageRoute(
+                                                    builder: (context) => LiveTracking(
+                                                        transaction:
+                                                            widget.transaction,
+                                                        pricingDetails: widget
+                                                            .pricingDetails,
+                                                        duration:
+                                                            widget.duration,
+                                                        distance:
+                                                            widget.distance,
+                                                        customerTransaction: widget
+                                                            .customerTransaction,
+                                                        driverBid:
+                                                            driverList2[index],
+                                                        newLocation: widget
+                                                            .newLocation)));
+                                          } else {
+                                            QuickAlert.show(
+                                                context: context,
+                                                type: QuickAlertType.error,
+                                                text:
+                                                    "Gagal assign ke driver, klik pesan sekarang lagi");
+                                          } */
                                         });
+                                        /* Future.delayed(Duration(seconds: 2),
+                                            () {
+                                          
+                                        }); */
                                       }),
                                   MaterialButton(
                                       shape: const StadiumBorder(),
