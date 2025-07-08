@@ -1,7 +1,7 @@
 class ApiNetwork {
-  String baseUrl = "https://devapi.smartrans.id/api/app/";
+  String baseUrl = "https://alamat_api/api/app/";
 
-  String oldUrl = "https://api.smartrans.id/root/api/";
+  String oldUrl = "https://alamat_api/root/api/";
 
   String sendFCM = "https://fcm.googleapis.com/fcm/send";
 }
